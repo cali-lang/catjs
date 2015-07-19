@@ -1,0 +1,842 @@
+/*
+ * Copyright 2015 Austin Lehman
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+include console;
+include lang.ast;
+
+/*
+ * Catjs class is the main class for compiling a cali-lang AST into 
+ * JavaScript. The resulting JS code relys on catjs.js.
+ */
+class catjs
+{
+	modName = '';				// module name
+	at = null;					// ast obj
+	
+	nl = '\n';					// newline character
+	
+	locals = [];				// local variable conatiner. this is used for 
+								// keeping track of local vars already defined 
+								// for the current method.
+	
+	pretty = false;				// pretty print
+	
+	varNum = 0;					// this is used for dynamically created variables and is 
+								// incremented each time.
+	
+	mainFunct = null;			// where main is defined. checks for main method in static 
+								// classes and if found is called onLoad.
+	
+	mpnum = 0;
+	mapDis = [];				// map discontinuities ... happens because with js object/map
+								// variables aren't evaluated when defined, they are for some
+								// reason treated just like a string.
+	
+	
+	/***********************************************************************
+	 * Public Methods
+	 **********************************************************************/
+	/*
+	 * Default constructor takes the module name in the standard 
+	 * cali-lang include format. (ex: net.httpClient)
+	 * TODO: Thinking this needs to take a list of module names instead
+	 * of a single module string.
+	 */
+	public catjs(string ModuleName)
+	{
+		this.modName = ModuleName;
+	}
+	
+	/*
+	 * Compile function compiles the module(s) and returns a string with 
+	 * the compiled JavaScript. The single argument Pretty takes a bool with 
+	 * true for pretty print formatting for the resulting JS code.
+	 */
+	public compile(bool Pretty = false)
+	{
+		this.pretty = Pretty;
+		if(!this.pretty) { this.nl = ''; }
+		
+		if(this.modName != "")
+		{
+			res = "";
+			
+			this.at = new ast();
+			this.at.parse(this.modName);
+			
+			classes = this.at.getClasses();
+			for(key : classes) { res += this.compileClass(classes[key]) + this.nl; }
+			
+			// if main is defined have it called on window load
+			if(this.mainFunct != null) { res += 'window.onload=function(){' + this.mainFunct + '();}'; }
+			
+			return res;
+		}
+		else { throw "No file set to parse."; }
+	}
+	
+	
+	/***********************************************************************
+	 * Private Methods
+	 **********************************************************************/
+	/*
+	 * Compiles the provided cclass object and returns a string representation
+	 * of the class in JS.
+	 */
+	private compileClass(object cls)
+	{	
+		rstr = "";
+		
+		if(cls.isStatic)
+		{
+			this.locals = [];
+			
+			rstr += "var " + cls.name + "_construct = function " + cls.name + "(){" + this.nl;
+			
+			// build extended classes
+			rstr += this.compileExtended(cls, 0);
+			
+			// build members section
+			rstr += this.compileMembers(cls, 0);
+			
+			// build methods
+			rstr += this.compileFunctions(cls, 1, true);
+			
+			rstr += "};" + this.nl;
+			rstr += "var " + cls.name + "=new " + cls.name + "_construct();" + this.nl;
+			
+		}
+		else if(cls.isExtern)
+		{
+			// throw error possibly?
+		}
+		else
+		{
+			this.locals = [];
+			
+			rstr += "var " + cls.name + " = function " + cls.name + "(){" + this.nl;
+			
+			// build extended classes
+			rstr += this.compileExtended(cls, 0);
+			
+			// build members section
+			rstr += this.compileMembers(cls, 0);
+			
+			// build methods
+			rstr += this.compileFunctions(cls, 1);
+			
+			// if has arguments, run constructor w/args
+			if(this.hasConstructor(cls))
+			{
+				rstr += this.t(1) + 'this.' + cls.name + '.apply(this, arguments);' + this.nl;
+			}
+			
+			rstr += "};" + this.nl;
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Compiles the extended (inherited) classes for a given class.
+	 */
+	private compileExtended(cls, t)
+	{
+		rstr = '';
+		
+		for(cname : cls.extended)
+		{
+			rstr += this.t(t + 1) + cname + '.call(this);' + this.nl;
+		}
+		
+		rstr += this.t(t + 1) + 'this.extended=[';
+		for(i = 0; i < #cls.extended; i++)
+		{
+			if(i > 0) { rstr += ","; }
+			rstr += "'" + cls.extended[i] + "'";
+		}
+		rstr += '];' + this.nl;
+		
+		return rstr;
+	}
+	
+	/*
+	 * Compiles the class members for the provided class.
+	 */
+	private compileMembers(cls, t, isStatic = false)
+	{
+		rstr = '';
+		
+		for(mname : cls.members)
+		{
+			mem = cls.members[mname];
+			rstr += this.t(t + 1);
+			if(isStatic) { rstr += "'" + mem.value.name + "':" + this.evalAst(mem.value.value, t) + ',' + this.nl; }
+			else { rstr += 'this.' + mem.value.name + '=' + this.evalAst(mem.value.value, t) + ';' + this.nl; }
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Compiles all functions for the provided class.
+	 */
+	private compileFunctions(cls, t, isStatic = false)
+	{
+		rstr = '';
+		for(fname : cls.functions)
+		{
+			
+			
+			this.locals = [];
+			funct = cls.functions[fname];
+			fargs = this.getFunctArgs(funct.value.args);
+			
+			if(isStatic)
+			{
+				// check for main
+				if(this.mainFunct == null && fname == 'main') 
+				{
+					this.mainFunct = cls.name + '.' + fname;
+					console.println('main:' + this.mainFunct);
+				}
+			}
+		
+			rstr += this.t(t) + "this." + fname + "=function(" + fargs + "){" + this.nl;
+			if(this.hasEtcetera(funct.value))
+			{
+				rstr += this.t(t + 1) + "var etc=(Array.prototype.slice.call(arguments)).slice(" + (#funct.value.args - 1) + ");" + this.nl;
+			}
+			rstr += this.getInstructions(funct.value.instructions, t + 1);
+			rstr += this.t(t) + "};" + this.nl;
+		}
+		return rstr;
+	}
+	
+	
+	/*
+	 * Helper checks to see if the class has a constructor.
+	 */
+	private hasConstructor(object cls)
+	{
+		for(fname : cls.functions)
+		{
+			if(fname == cls.name) { return true; }
+		}
+		return false;
+	}
+	
+	/*
+	 * Helper that compiles the function arguments for a function 
+	 * definition.
+	 */
+	private getFunctArgs(object args)
+	{
+		alist = [];
+		for(aobj : args)
+		{
+			if(!(aobj instanceof 'cetcetera'))
+			{
+				alist @= aobj.name;
+				this.locals @= aobj.name;
+			}
+		}
+		return string.implode(alist, ', ');
+	}
+	
+	/*
+	 * Checks to see if the function definition arguments contains the 
+	 * etc operator.
+	 */
+	private hasEtcetera(object funct)
+	{
+		if(#funct.args > 0 && funct.args[#funct.args-1] instanceof 'cetcetera') { return true; }
+		return false;
+	}
+	
+	/*
+	 * Complies a list of provided instructions.
+	 */
+	private getInstructions(object instructions, t)
+	{
+		rstr = '';
+		
+		for(inst : instructions)
+		{
+			rstr += this.t(t) + this.evalAst(inst, t);
+			
+			if(
+				inst instanceof 'cifelse'
+				|| inst instanceof 'cswitch'
+				|| inst instanceof 'cfor'
+				|| inst instanceof 'cwhile'
+				|| inst instanceof 'ctrycatch'
+			)
+			{ }
+			else
+			{
+				rstr += ';' + this.nl;
+				if(#this.mapDis)
+				{
+					for(itm: this.mapDis)
+					{
+						rstr += this.t(t) + itm[0] + '=[' + itm[1] + ']=' + itm[2] + ';' + this.nl;
+					}
+					list.clear(this.mapDis);
+				}
+			}
+			
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates the provided AST class.
+	 */
+	private evalAst(object obj, t)
+	{
+		rstr = '';
+		if(obj instanceof 'cnull') { rstr += this.getNull(obj, t); }
+		else if(obj instanceof 'cbool') { rstr += this.getBool(obj, t); }
+		else if(obj instanceof 'cint') { rstr += this.getInt(obj, t); }
+		else if(obj instanceof 'cdouble') { rstr += this.getDouble(obj, t); }
+		else if(obj instanceof 'cstring') { rstr += this.getString(obj, t); }
+		else if(obj instanceof 'clist') { rstr += this.getList(obj, t); }
+		else if(obj instanceof 'cmap') { rstr += this.getMap(obj, t); }
+		else if(obj instanceof 'cexpression') { rstr += this.getExpression(obj, t); }
+		else if(obj instanceof 'cvar') { rstr += this.getVar(obj, t); }
+		else if(obj instanceof 'creturn') { rstr += this.getReturn(obj, t); }
+		else if(obj instanceof 'cbreak') { rstr += this.getBreak(obj, t); }
+		else if(obj instanceof 'cfunctcall') { rstr += this.getFunctCall(obj, t); }
+		else if(obj instanceof 'cifelse') { rstr += this.getIfElse(obj, t); }
+		else if(obj instanceof 'cswitch') { rstr += this.getSwitch(obj, t); }
+		else if(obj instanceof 'cfor') { rstr += this.getFor(obj, t); }
+		else if(obj instanceof 'cwhile') { rstr += this.getWhile(obj, t); }
+		else if(obj instanceof 'cthrow') { rstr += this.getThrow(obj, t); }
+		else if(obj instanceof 'ctrycatch') { return this.getTryCatch(obj, t); }
+		else if(obj instanceof 'ccallback') { return this.getCallback(obj, t); }
+		else if(obj instanceof 'cnew') { return this.getNew(obj, t); }
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a null expression.
+	 */
+	private getNull(object obj, t) { return "null"; }
+	
+	/*
+	 * Evaluates a string expression escaping special characters.
+	 */
+	private getString(object obj, t) { return "\"" + this.escapeString(obj.value) + "\""; }
+	
+	/*
+	 * Evaluates a boolean expression.
+	 */
+	private getBool(object obj, t) { return bool.toString(obj.value); }
+	
+	/*
+	 * Evaluates an integer expression.
+	 */
+	private getInt(object obj, t) { return int.toString(obj.value); }
+	
+	/*
+	 * Evaluates a double expression.
+	 */
+	private getDouble(object obj, t) { return double.toString(obj.value); }
+	
+	/*
+	 * Evaluates a list expresson.
+	 */
+	private getList(object obj, t)
+	{
+		items = [];
+		for(itm : obj.value) { items @= this.evalAst(itm, t); }
+		return "[" + string.implode(items, ',') + "]";
+	}
+	
+	/*
+	 * Evaluates a map expression.
+	 */
+	private getMap(object obj, t)
+	{
+		rstr = 'new calimap()';
+		if(lang.type(obj.value) == 'list')
+		{
+			for(itm : obj.value)
+			{
+				rstr = 'map.put(' + rstr + ', ' +  this.evalAst(itm.value[0], t) + ', ' + this.evalAst(itm.value[1], t) + ')';
+			}
+		}
+		else
+		{
+			for(key : obj.value) { rstr = "map.put(" + rstr + ", '" + key + "', " + this.evalAst(obj.value[key], t) + ')'; }
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a variable expression.
+	 */
+	private getVar(object vr, t)
+	{
+		return vr.name;
+	}
+	
+	/*
+	 * Evaluates a return expression.
+	 */
+	private getReturn(object rt, t)
+	{
+		rexp = '';
+		if(rt.exp) { rexp = this.evalAst(rt.exp, t); }
+		return 'return ' + rexp;
+	}
+	
+	/*
+	 * Evaluates a break expression.
+	 */
+	private getBreak(object br, t)
+	{
+		return 'break';
+	}
+	
+	/*
+	 * Evaluates a function call expression.
+	 */
+	private getFunctCall(object fc, t)
+	{
+		rstr = fc.name;
+		rstr += "(" + this.evalArgs(fc.args) + ")";
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates an if/else if/else block expression.
+	 */
+	private getIfElse(object ie, t)
+	{
+		// if
+		rstr = 'if(';
+		rstr += this.evalAst(ie.ifCond.exp, t);
+		rstr += ')' + this.nl;
+		rstr += this.t(t) + '{' + this.nl;
+		rstr += this.getInstructions(ie.ifCond.instructions, t + 1);
+		rstr += this.t(t) + '}' + this.nl;
+		
+		// else if sections
+		for(iesect : ie.ifElseConds)
+		{
+			rstr += this.t(t) + 'else if(';
+			rstr += this.evalAst(iesect.exp, t);
+			rstr += ')' + this.nl;
+			rstr += this.t(t) + '{' + this.nl;
+			rstr += this.getInstructions(iesect.instructions, t + 1);
+			rstr += this.t(t) + '}' + this.nl;
+		}
+		
+		// else section
+		if(#ie.elseInstructions)
+		{
+			rstr += this.t(t) + 'else' + this.nl;
+			rstr += this.t(t) + '{' + this.nl;
+			rstr += this.getInstructions(ie.elseInstructions, t + 1);
+			rstr += this.t(t) + '}' + this.nl;
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a switch expression block.
+	 */
+	private getSwitch(object sw, t)
+	{
+		// switch
+		rstr = 'switch(';
+		rstr += this.evalAst(sw.exp, t);
+		rstr += ')' + this.nl;
+		rstr += this.t(t) + '{' + this.nl;
+		
+		// case sections
+		for(cs : sw.conds)
+		{
+			rstr += this.t(t + 1) + 'case ' + this.evalAst(cs.exp, t + 1) + ':' + this.nl;
+			rstr += this.getInstructions(cs.instructions, t + 2);
+		}
+		
+		// defaut section
+		if(#sw.defInstructions)
+		{
+			rstr += this.t(t + 1) + 'default:' + this.nl;
+			rstr += this.getInstructions(sw.defInstructions, t + 2);
+		}
+		rstr += this.t(t) + '}' + this.nl;
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a for expression block.
+	 */
+	private getFor(object fr, t)
+	{
+		rstr = 'for(';
+		
+		if(fr.isForeach)
+		{
+			lv = this.genVar();
+			rstr += this.getLocalStr(lv) + '=0; ' + lv + '<lang.count(' + this.evalAst(fr.eachExp, t) + ');' + lv + '++)' + this.nl;
+			rstr += this.t(t) + '{' + this.nl;
+			rstr += this.t(t + 1) + 'var ' + this.evalAst(fr.eachVar, t) + '=lang.itemAtIndex(' + this.evalAst(fr.eachExp, t) + ',' + lv + ');' + this.nl;
+			rstr += this.getInstructions(fr.instructions, t + 1);
+			rstr += this.t(t) + '}' + this.nl;
+		}
+		else
+		{
+			rstr += this.evalAst(fr.expInit, t) + ';';
+			rstr += this.evalAst(fr.expCond, t) + ';';
+			rstr += this.evalAst(fr.expInc, t);
+			rstr += ')' + this.nl;
+			rstr += this.t(t) + '{' + this.nl;
+			rstr += this.getInstructions(fr.instructions, t + 1);
+			rstr += this.t(t) + '}' + this.nl;
+		}
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a while expression block.
+	 */
+	private getWhile(object wh, t)
+	{
+		rstr = 'while(';
+		rstr += this.evalAst(wh.exp, t);
+		rstr += ')' + this.nl;
+		rstr += this.t(t) + '{' + this.nl;
+		rstr += this.getInstructions(wh.instructions, t + 1);
+		rstr += this.t(t) + '}' + this.nl;
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a throw expression.
+	 */
+	private getThrow(object th, t)
+	{
+		return 'throw ' + this.evalAst(th.exp, t);
+	}
+	
+	/*
+	 * Evaluates a try/catch expression block.
+	 */
+	private getTryCatch(object tc, t)
+	{
+		rstr = 'try' + this.nl;
+		rstr += this.t(t) + '{' + this.nl;
+		rstr += this.getInstructions(tc.tryInstructions, t + 1);
+		rstr += this.t(t) + '}' + this.nl;
+		
+		rstr += this.t(t) + 'catch(js_exception_str)' + this.nl;
+		rstr += this.t(t) + '{' + this.nl;
+		rstr += this.t(t + 1) + 'var ' + tc.name + ' = new except(js_exception_str);' + this.nl;
+		rstr += this.getInstructions(tc.catchInstructions, t + 1);
+		rstr += this.t(t) + '}' + this.nl;
+		
+		return rstr;
+	}
+	
+	/*
+	 * Evaluates a callback expression.
+	 */
+	private getCallback(object cb, t)
+	{
+		return 'new callback(this, this.' + cb.functName + ')';
+	}
+	
+	/*
+	 * Evaluates a new object expression.
+	 */
+	private getNew(object nw, t)
+	{
+		return 'new ' + nw.name + '(' + this.evalArgs(nw.args) + ')';
+	}
+	
+	/*
+	 * Evaluates a function call arguments list expression.
+	 */
+	private evalArgs(list args)
+	{
+		items = [];
+		for(arg : args)
+		{
+			items @= this.evalAst(arg, t);
+		}
+		return string.implode(items, ',');
+	}
+	
+	/*
+	 * Expression handling
+	 */
+	private getExpression(object exp, t)
+	{
+		rstr = '';
+		
+		if(exp.etype == 'cassignment') { rstr += this.getExpAssignment(exp, t); }
+		else if(exp.etype == 'cmembref') { rstr += this.getExpMembref(exp, t); }
+		else if(exp.etype == 'cadd') { rstr += this.getExpAdd(exp, t); }
+		else if(exp.etype == 'csubtract') { rstr += this.getExpSubtract(exp, t); }
+		else if(exp.etype == 'cmultiply') { rstr += this.getExpMultiply(exp, t); }
+		else if(exp.etype == 'cdivide') { rstr += this.getExpDivide(exp, t); }
+		else if(exp.etype == 'cmodulus') { rstr += this.getExpModulus(exp, t); }
+		else if(exp.etype == 'ceqeq') { rstr += this.getExpEqeq(exp, t); }
+		else if(exp.etype == 'cnoteq') { rstr += this.getExpNoteq(exp, t); }
+		else if(exp.etype == 'clt') { rstr += this.getExpLt(exp, t); }
+		else if(exp.etype == 'cgt') { rstr += this.getExpGt(exp, t); }
+		else if(exp.etype == 'clteq') { rstr += this.getExpLteq(exp, t); }
+		else if(exp.etype == 'cgteq') { rstr += this.getExpGteq(exp, t); }
+		else if(exp.etype == 'cnot') { rstr += this.getExpNot(exp, t); }
+		else if(exp.etype == 'cand') { rstr += this.getExpAnd(exp, t); }
+		else if(exp.etype == 'cor') { rstr += this.getExpOr(exp, t); }
+		else if(exp.etype == 'ccount') { rstr += this.getExpCount(exp, t); }
+		else if(exp.etype == 'cnewlist') { rstr += this.getExpNewList(exp, t); }
+		else if(exp.etype == 'cnewmap') { rstr += this.getExpNewMap(exp, t); }
+		else if(exp.etype == 'cfunctcall') { rstr += this.getExpFunctCall(exp, t); }
+		else if(exp.etype == 'cderef') { rstr += this.getExpDeref(exp, t); }
+		else if(exp.etype == 'cinsert') { rstr += this.getExpInsert(exp, t); }
+		else if(exp.etype == 'cinstanceof') { rstr += this.getExpInstanceof(exp, t); }
+		return rstr;
+	}
+	
+	// Assignment.
+	private getExpAssignment(exp, t)
+	{
+		rstr = '';
+		if(exp.left instanceof 'cvar' && !list.contains(this.locals, exp.left.name))
+		{
+			this.locals @= exp.left.name;
+			rstr += 'var ';
+		}
+		rstr += this.evalAst(exp.left, t) + '=' + this.evalAst(exp.right, t);
+		return rstr;
+	}
+	
+	// Member reference.
+	private getExpMembref(exp, t)
+	{
+		rstr = '';
+		rstr += this.evalAst(exp.left, t) + '.' + this.evalAst(exp.right, t);
+		return rstr;
+	}
+	
+	// Addition/Concatenation.
+	private getExpAdd(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '+' + this.evalAst(exp.right, t));
+	}
+	
+	// Math subtraction.
+	private getExpSubtract(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '-' + this.evalAst(exp.right, t));
+	}
+	
+	// Math multiplication.
+	private getExpMultiply(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '*' + this.evalAst(exp.right, t));
+	}
+	
+	// Math division.
+	private getExpDivide(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '/' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparision equal equal.
+	private getExpEqeq(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '==' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparison not equal.
+	private getExpNoteq(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '!=' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparison less than.
+	private getExpLt(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '<' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparison greater than.
+	private getExpGt(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '>' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparison less than equal to.
+	private getExpLteq(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '<=' + this.evalAst(exp.right, t));
+	}
+	
+	// Comparison greater than equal to.
+	private getExpGteq(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '>=' + this.evalAst(exp.right, t));
+	}
+	
+	// Logic not.
+	private getExpNot(exp, t)
+	{
+		return this.expWrap('!' + this.evalAst(exp.left, t));
+	}
+	
+	// Logic and.
+	private getExpAnd(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '&&' + this.evalAst(exp.right, t));
+	}
+	
+	// Logic or.
+	private getExpOr(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '||' + this.evalAst(exp.right, t));
+	}
+	
+	// Count operator.
+	private getExpCount(exp, t)
+	{
+		return 'lang.count(' + this.evalAst(exp.left, t) + ')';
+	}
+	
+	// Modulus operator
+	private getExpModulus(exp, t)
+	{
+		return this.expWrap(this.evalAst(exp.left, t) + '%' + this.evalAst(exp.right, t));
+	}
+	
+	// Evaluate new list expression.
+	private getExpNewList(exp, t)
+	{
+		return this.evalAst(exp.left, t);
+	}
+	
+	// Evaluate new map expression.
+	private getExpNewMap(exp, t)
+	{
+		// bypass evalAst for this one as the map is acutally 
+		// implemented as a list of lists.
+		return this.getMap(exp.left, t);
+	}
+	
+	// Evaluate function call expression.
+	private getExpFunctCall(exp, t)
+	{
+		return this.evalAst(exp.left, t) + '.' + this.evalAst(exp.right, t);
+	}
+	
+	// Evaluate dereference expression.
+	private getExpDeref(exp, t)
+	{
+		rstr = this.evalAst(exp.left, t);
+		if(exp.dtype != 'cmaplist' && (exp.left instanceof 'cvar' || exp.dtype == 'cobj') && exp.right && exp.right instanceof 'cvar')
+		{ rstr += "['" + this.evalAst(exp.right, t) + "']"; }
+		else { rstr += "[" + this.evalAst(exp.right, t) + "]"; }
+		return rstr;
+	}
+	
+	// Evaluate insert operator.
+	private getExpInsert(exp, t)
+	{
+		return this.evalAst(exp.left, t) + '.push(' + this.evalAst(exp.right, t) + ')';
+	}
+	
+	// Evaluate instanceof operator.
+	private getExpInstanceof(exp, t)
+	{
+		return 'lang.instanceof(' + this.evalAst(exp.left, t) + ',' + this.evalAst(exp.right, t) + ')';
+	}
+	
+	/*
+	 * Helper to dynamically create a variable when needed during compilation.
+	 */
+	private genVar()
+	{
+		tv = 'cv' + this.varNum;
+		this.varNum++;
+		return tv;
+	}
+	
+	/*
+	 * Helper that gets a local variable. If not defined yet it prepends a 
+	 * 'var' string, otherwise just returns the variable string.
+	 */
+	private getLocalStr(varName)
+	{
+		rstr = '';
+		if(!list.contains(this.locals, varName))
+		{
+			this.locals @= varName;
+			rstr = 'var ';
+		}
+		rstr += varName;
+		return rstr;
+	}
+	
+	/*
+	 * formatting methods
+	 */
+	
+	/*
+	 * Escape string valuse for double quote, newline, return and tab characters.
+	 */
+	private escapeString(string Str)
+	{
+		rstr = Str;
+		rstr = string.replace(rstr, "\"", "\\\"");
+		rstr = string.replace(rstr, "\n", "\\\n");
+		rstr = string.replace(rstr, "\r", "\\\r");
+		rstr = string.replace(rstr, "\t", "\\\t");
+		return rstr;
+	}
+	
+	/*
+	 * Used for pretty print.
+	 */
+	private t(int Tabs)
+	{
+		rstr = '';
+		if(this.pretty)
+		{
+			for(i = 0; i < Tabs; i++) { rstr += '\t'; }
+		}
+		return rstr;
+	}
+	
+	/*
+	 * Used to wrap expressions in JS.
+	 */
+	private expWrap(content)
+	{
+		return '(' + content + ')';
+	}
+}

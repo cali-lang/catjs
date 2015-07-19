@@ -1,0 +1,369 @@
+/*
+ * Copyright 2015 Austin Lehman
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/***********************************************************************
+ * catjsTest.ca
+ * 
+ * Purpose:
+ * This cali-lang program extends httpServer and when started will serve
+ * a catjs test page at localhost:8080.
+ * 
+ * Requirements:
+ * A local installation of cali-lang version 0.95a or later.
+ * 
+ * Note:
+ * For Linux/Unix/OSX you can start this script by running the 
+ * runTest.sh shell script. If you perfer to launch it yourself or 
+ * when ran from windows use the following command. This cali-lang 
+ * program requires more than the default JVM stack space.
+ * 
+ * shell> cali -Xss10M catjsTest.ca
+ **********************************************************************/
+
+include console;
+include sys;
+include net.httpServer;
+include file;
+include net.html.html;
+include net.catjs.catjs;
+
+class catjsTest : httpServer
+{
+	public main(args)			// program entry point
+	{
+		ex = new catjsTest();		// create new example object
+		ex.start();				// call super method start to start server
+		while(true) { sys.sleep(1000); }
+	}
+
+	serverName = null;			// server name ... set in constructor
+	serverPort = 8080;			// default server port
+	
+	public catjsTest()
+	{
+		// Set server name and call httpServer constructor with port and handle method.
+		this.serverName = 'catjsTest/1.0 (' + sys.getCaliVersion() + ', Simple 4.0)';
+		this.httpServer(this.serverPort, ::'handle');				// Call parent constructor
+		
+		console.println("Starting catjsTest on port " + this.serverPort + " ...");
+	}
+	
+	/* Handle requests */
+	public handle(object req, object res)
+	{
+		// get requested resource
+		pname = req.getPath()['toString'];
+		console.println("Requested Resource: " + pname);
+		
+		try
+		{
+			if(pname == '/' || pname == "/index") 
+			{ this.setHeaderInfo(res); res.setContent((new index()).toString()); }						// index page
+			else if(pname == "/catjs.js")
+			{ this.setHeaderInfo(res); res.setContent(file.read('public_html/js/catjs.js')); }			// base catjs js lib
+			else if(pname == "/catjsTest.js")
+			{ this.serveJs(res, 'cajs.catjsTest_js'); }
+			else if(pname == "/getString")
+			{ this.setHeaderInfo(res); res.setContent("catjs getString test"); }						// returns a simple string for testing
+			else if(pname == "/catjsTest_js.ca")														// Serves catjsTest_js.ca for viewing.
+			{ this.setHeaderInfo(res); res.setContent(file.read('cajs/catjsTest_js.ca')); }
+			else if(pname == "/jstests.ca")																// Serves jstests.ca for viewing.
+			{ this.setHeaderInfo(res); res.setContent(file.read('net/catjs/jstests.ca')); }
+			else if(pname == "/catjs.ca")																// Serves catjs.ca for viewing.
+			{ this.setHeaderInfo(res); res.setContent(file.read('net/catjs/catjs.ca')); }
+			else if(pname == '/favicon.ico') { res.close(); /* No favicon */ }
+			else
+			{
+				// resource not found, send 400
+				res
+					.setCode(400)
+					.setContent("")
+				;
+			}
+		}
+		catch(e)
+		{
+			console.err(e.getStackTrace());
+		}
+	}
+	
+	// Sets the response header info.
+	public setHeaderInfo(object res)
+	{
+		// Server time mills
+		tm = (new date()).getTime();
+		
+		// HTTP Header Info
+		res.setValue('Server', this.serverName);
+		res.setValue('Date', tm);
+		res.setValue('Last-Modified', tm);
+	}
+	
+	// Includes the requeted module and sends the compiled
+	// JS result to the browser.
+	private serveJs(object res, string Mod)
+	{
+		console.println("including module '" + Mod + "' ...");
+		
+		this.setHeaderInfo(res);
+		
+		cjs = new catjs(Mod);
+		jsstr = cjs.compile(true);
+		
+		res.setContent(jsstr);
+	}
+}
+
+/*
+ * The index page class which provides a brief description of catjs 
+ * along with a couple divs that catjsTest_js.ca will use to populate 
+ * the run button, result table and summary table.
+ */
+class index : _html
+{
+	public head = null;
+	public bsLink = null;
+	public title = null;
+	public body = null;
+	
+	public pg = null;
+	
+	// list of implemented classes
+	public impClasses = 
+	[
+		'Basic language structures',
+		'lang',
+		'null',
+		'bool',
+		'int *',
+		'double *',
+		'string *',
+		'list',
+		'map',
+		'exceptions',
+		'callbacks',
+		'console *',
+		'sys',
+		'json *',
+		'url *',
+		'httpClient *'
+	];
+	
+	// build the page
+	public index()
+	{
+		this._html();
+		
+		this.head = new _head();
+		this.add(this.head);
+		
+		this.head.add((new _meta()).set('charset', 'utf-8'));
+		this.head.add(new _meta('viewport', 'width=device-width, initial-scale=1'));
+		
+		this.bsLink = new _link('stylesheet', 'text/css', 'https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css');
+		this.head.add(this.bsLink);
+		
+		this.title = new _title(new _text('CATJS - CAli-lang To JavaScript - Test Program'));
+		this.head.add(this.title);
+		
+		this.body = new _body();
+		this.add(this.body);
+		
+		// body section
+		this.buildBody();
+		
+		cjs = (new _script()).set('src', '/catjs.js');
+		this.body.add(cjs);
+		thejs = (new _script()).set('src', '/catjsTest.js');
+		this.body.add(thejs);
+	}
+	
+	// build the page body
+	private buildBody()
+	{
+		this.pg = new _div(null, 'pg', 'container');
+		this.body.add(this.pg);
+		
+		// title
+		heading = new _h1(new _text("CATJS - CAli-lang To JavaScript"));
+		this.pg.add(heading);
+		
+		// about
+		this.pg.add(new _h3(new _text('About:')));
+		this.pg.add(this.getPageIntro());
+		
+		// basic usage
+		this.pg.add(new _h3(new _text('Basic Usage:')));
+		this.pg.add(this.getBasicUsage());
+		
+		// implemented objects
+		this.pg.add(new _h3(new _text('Implemented Objects:')));
+		this.pg.add(this.getImpObj());
+		
+		// browser tests
+		this.pg.add(new _h3(new _text('Browser Tests:')));
+		this.pg.add(this.getBrowserTests());
+		
+		// test div
+		this.pg.br().br();
+		td = new _div(null, 'test_div');
+		this.pg.add(td);
+	}
+	
+	/*
+	 * Gets page introduction
+	 */
+	private getPageIntro()
+	{
+		ret = new _div();
+		ret.add(new _text(
+"""
+Catjs is a cali-lang to javascript transpiler. It's entirely written in cali-lang 
+and uses the native ast.ca library to convert the cali-lang AST into javascript. 
+The goal of catjs is to allow much of the native cali-lang code to be compiled 
+directly into JavaScript and ran in the web browser.
+"""));
+		ret.br().br().add(new _b(new _text('Benifits')));
+		ret.add(
+			(new _ul())
+				.add(new _li('Object orientation of the client JavaScript code.'))
+				.add(new _li('Reuse of objects on server and client.'))
+				.add(new _li('Unit testing of both server and client side code in the same environment.'))
+				.add(new _li('Reduces the number of developement skillsets required to create web applications.'))
+				.add(new _li('Simplifies web application development.'))
+		);
+		return ret;
+	}
+	
+	/*
+	 * Gets basic usage html/text
+	 */
+	private getBasicUsage()
+	{
+		ret = new _div();
+		ret
+			.add(new _text(
+"""
+Using catjs is fairly simple and straightforward. You can serve 
+the compiled JS as is and simply send it to the browser. Another option is 
+to compile and cache in a variable to be used over and over by the web 
+server. Yet another option is to compile and save to file and just serve 
+the file from a web server.
+"""))
+			.br().br()
+			.add((new _b()).text('Note: '))
+			.add(new _text(
+"""
+The resulting compiled JS code relies on catjs.js JavaScript file. This 
+file needs to be included in the page with a script tag and served from 
+the web server along with the page and the results from the compiled JS.
+"""))
+		;
+
+		ret.br().br().add((new _pre())
+			.set('style', 'overflow: auto; word-wrap: normal; white-space: pre;')
+			.addClass('pre-scrollable')
+			.text(
+"""
+// Include catjs library.
+include net.catjs.catjs;
+
+...
+
+// Create a new catjs object with the module name that 
+// we wish to compile to JS.
+cjs = new catjs('somePackage.someModule');
+
+// Call compile with optional pretty argument.
+// If pretty == true, then the resulting JS will have newline 
+// and indentation characters.
+jsstr = cjs.compile(true);
+
+// The results stored in jsstr is the text JavaScript compiled 
+// from the cali-lang module.
+
+
+"""));
+		return ret;
+	}
+
+	/*
+	 * Gets implemented objects section
+	 */
+	public getImpObj()
+	{
+		ret = new _div();
+		
+		lst = new _ul();
+		ret.add(lst);
+		
+		for(str : this.impClasses)
+		{
+			lst.add(new _li(str));
+		}
+		
+		ret.br().text(
+"""
+* Select methods haven't been implemented yet. Run unit tests below to see 
+the unimplemented methods. Some methods aren't implemented because they just 
+don't apply in the browser such as file IO because of security limitations.
+""")
+		.br().br().add((new _b()).text('A word about the dom ...'))
+		.text(
+"""
+Most programming languages have no native notion of a window or DOM. In order 
+for cali-lang code to interface with the window and document objects within a 
+web browser these objects need to be created. It's not a requirement for catjs 
+to have native implementations of win/doc objects in order to compile 
+to JavaScript and interface with the window/document however they are required for unit 
+testing in cali-lang outside of the browser. Currently the win/doc objects can be 
+used, but don't exist in native cali-lang code ... on the todo list.
+""")
+		;
+		
+		return ret;
+	}
+	
+	
+	public getBrowserTests()
+	{
+		ret = new _div();
+		
+		ret.text(
+"""
+Below is a button to run the browser tests. The tests are all defined in 
+cali-lang within the catjsTest_js.ca file. This file is compiled into 
+JavaScript and served to the browser along with the required catjs.js JS 
+file. catjsTest_js.ca also includes net.catjs.jstests module which is 
+included in the generated JS. Here are the links to those files including 
+catjs.ca.
+""");
+		ret
+			.br().br()
+			.add((new _a('catjsTest_js.ca', new _text('catjsTest_js.ca'))).set('target', '_blank')).br()
+			.add((new _a('jstests.ca', new _text('jstests.ca'))).set('target', '_blank')).br()
+			.add((new _a('catjs.ca', new _text('catjs.ca'))).set('target', '_blank')).br()
+			.add((new _a('catjs.js', new _text('catjs.js'))).set('target', '_blank')).br()
+			.br()
+		;
+		return ret;
+	}
+}
+
+
+
+
+

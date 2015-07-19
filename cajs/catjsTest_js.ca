@@ -1,0 +1,1117 @@
+/*
+ * Copyright 2015 Austin Lehman
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/***********************************************************************
+ * catjsTest_js.ca
+ *
+ * Purpose:
+ * This file is written in cali-lang but is compiled into Java-Script 
+ * and served to the browser as catjsTest.js file. It's responsible for 
+ * the setup and execution of all the unit tests in the catjs project.
+ **********************************************************************/
+
+// Include jstests.ca file which defines the test class.
+include net.catjs.jstests;
+
+/***********************************************************************
+ * Results table. This class manages displaying the browser unit test
+ * retuls.
+ **********************************************************************/
+class resultsTable
+{
+	tbl = null;
+	body = null;
+	
+	public resultsTable()
+	{
+		// table
+		this.tbl = doc.create('table', 'results_table');
+		this.tbl.set('class', 'table table-hover');
+		
+		// head
+		tblhd = doc.create('thead');
+		this.tbl.add(tblhd);
+		tblhr = doc.create('tr');
+		tblhr
+			.add((doc.create('th')).text('Item'))
+			.add((doc.create('th')).text('Test'))
+			.add((doc.create('th')).text('Result'))
+		;
+		tblhd.add(tblhr);
+		
+		// table body
+		this.body = doc.create('tbody', 'results_table_body');
+		this.tbl.add(this.body);
+	}
+	
+	public clear()
+	{
+		if(this.body) { this.body.clear(); }
+		return this;
+	}
+	
+	public addResult(object Test)
+	{
+		rw = doc.create('tr');
+		
+		(titem = doc.create('td')).text(Test.item);
+		(ttest = doc.create('td')).text(Test.test);
+		
+		tres = doc.create('td');
+		tresspn = doc.create('span');
+		h = (doc.create('h4')).add(tresspn);
+		tres.add(h);
+		if(Test.result)
+		{
+			if(Test.error == 'Not Implemented')
+			{
+				tresspn.set('class', 'label label-warning').text('Not Implemented');
+			}
+			else
+			{
+				tresspn.set('class', 'label label-success').text('Success');
+			}
+		}
+		else
+		{
+			tresspn.set('class', 'label label-danger').text('Failed');
+			errtxt = Test.error;
+			if(errtxt) { tresspn.set('title', errtxt); }
+			else { tresspn.set('title', 'Test condition failed.'); }
+		}
+		
+		rw
+			.add(titem)
+			.add(ttest)
+			.add(tres)
+		;
+		
+		this.body.add(rw);
+	}
+}
+
+/***********************************************************************
+ * Summary Table. This class manages displaying the browser unit tests
+ * summary results.
+ **********************************************************************/
+class summaryTable
+{
+	tbl = null;
+	body = null;
+	
+	public summaryTable()
+	{
+		// table
+		this.tbl = doc.create('table', 'summary_table');
+		this.tbl.set('class', 'table table-hover');
+		
+		// head
+		tblhd = doc.create('thead');
+		this.tbl.add(tblhd);
+		tblhr = doc.create('tr');
+		tblhr
+			.add((doc.create('th')).text('Key'))
+			.add((doc.create('th')).text('Value'))
+		;
+		tblhd.add(tblhr);
+		
+		// table body
+		this.body = doc.create('tbody', 'summary_table_body');
+		this.tbl.add(this.body);
+	}
+	
+	public clear()
+	{
+		if(this.body) { this.body.clear(); }
+		return this;
+	}
+	
+	public add(string Key, string Val)
+	{
+		rw = doc.create('tr');
+		
+		(tkey = doc.create('td')).text(Key);
+		(tval = doc.create('td')).text(Val);
+		
+		rw
+			.add(tkey)
+			.add(tval)
+		;
+		this.body.add(rw);
+		
+		return this;
+	}
+}
+
+/***********************************************************************
+ * Test Runner class manages running each browser unit test, updating 
+ * the results table and scrolls the browser to the bottom of the window.
+ **********************************************************************/
+class testRunner
+{
+	tests = [];
+	tbl = null;
+	sumtbl = null;
+	
+	public testRunner(ResultsTable, SummaryTable)
+	{
+		this.tbl = ResultsTable;
+		this.sumtbl = SummaryTable;
+	}
+	
+	public add(object Test) { this.tests @= Test; return this; }
+	
+	public run()
+	{
+		start = sys.getMills();
+		passed = 0;
+		failed = 0;
+		
+		for(tst : this.tests)
+		{
+			res = tst.run();
+			if(res) { passed++; }
+			else { failed++; }
+			this.tbl.addResult(tst);
+			win.scrollBottom();
+		}
+		end = sys.getMills();
+		
+		this.sumtbl
+			.add('Tests Ran: ', #this.tests)
+			.add('Passed: ', passed)
+			.add('Failed: ', failed)
+			.add('Elapsed Time: ', ((end - start)/1000.0) + 's')
+		;
+		win.scrollBottom();
+		
+		return this;
+	}
+}
+
+/***********************************************************************
+ * Helper classes below are just used for various unit tests.
+ **********************************************************************/
+class tobj
+{
+	
+}
+
+class extObj : tobj
+{
+	public extObj() { }
+	public getCb() { return ::'testCall'; }
+	public testCall(somev) { return somev; }
+}
+
+class email
+{
+	public address = "";
+	
+	public setAddress(string Address) { this.address = Address; }
+	public getAddress() { return this.address; }
+}
+
+class dog
+{
+	public breed = "undef";
+	public dog(string Breed) { this.breed = Breed; }
+}
+
+/***********************************************************************
+ * Static app class handles the state information and manages all the 
+ * unit tests. Class loads all the browser unit tests into the test 
+ * runner class and implements all test methods.
+ **********************************************************************/
+static class app
+{
+	btn = null;
+	glyph = null;
+	
+	restbl = null;
+	sumtbl = null;
+	runner = null;
+	
+	// parser test viables
+	memb = null;
+	memBlank;
+	memNull = null;
+	memBool = false;
+	memInt = 10;
+	memDouble = 123.456;
+	memString = "hi";
+	memList = ['one', 'two', 'three'];
+	memMap = { 'one' : 1, 'two' : 2, 'three' : 3 };
+	memNestedList = [ 0, 1, { 'one' : 1, 'two' : 2 } ];
+	memNestedMap = { 'one' : 1, 'two' : 2, 'three' : [ 0, 1, 2 ] };
+	memObj = null;
+	
+	// lang test variables
+	tlist = null;
+	tmap = null;
+	dt = null;
+	buff = null;
+	cb = null;
+	
+	// json test variables
+	jn = null;
+	
+	// httpClient test variables
+	cli = null;
+	pg = null;
+	
+	/*
+	 * Main method is the application entry point. This is called once 
+	 * the window is finished loading the page.
+	 */
+	public main()
+	{
+		mp = { 'one': 1, 'two': 2 };
+		this.init();					// call init method
+	}
+	
+	/*
+	 * Init method dynamically creates any required html, creates 
+	 * the results table, creates the summary table, init the test 
+	 * runner and adds all tests to the test runner.
+	 */
+	public init()
+	{
+		console.info("app.init(): Initializing app ...");
+		
+		// get page div
+		pg = doc.get('test_div');
+		
+		// run button
+		this.buildRunButton(pg);
+		
+		// results table
+		this.buildResultsTable(pg);
+		pg.br();
+		
+		// summary table
+		this.buildSummaryTable(pg);
+		pg.br();
+		
+		// create test runner
+		this.runner = new testRunner(this.restbl, this.sumtbl);
+		
+		// add tests
+		this.addTests();
+		
+		console.info("app.init(): App ready.");
+	}
+	
+	/*
+	 * Dynamically creates the run button on the page that will call 
+	 * the app.runTests method when clicked.
+	 */
+	public buildRunButton(pg)
+	{
+		this.btn = doc.create('button', 'run_button');
+		this.btn.set('class', 'btn btn-success btn-md');
+		this.btn.set('onclick', 'app.runTests();');
+		
+		this.btn.text('Run Tests ');
+		
+		this.glyph = doc.create('span', 'run_glyph');
+		this.glyph.set('class', 'glyphicon glyphicon-play');
+		this.btn.add(this.glyph);
+		
+		pg.add(this.btn);
+	}
+	
+	/*
+	 * Builds the results table in the page.
+	 */
+	public buildResultsTable(pg)
+	{
+		this.restbl = new resultsTable();
+		pg.add((doc.create('h4', 'results_table_title')).text("Results:"));
+		pg.add(this.restbl.tbl);
+	}
+	
+	/*
+	 * Builds the summary table in the page.
+	 */
+	public buildSummaryTable(pg)
+	{
+		this.sumtbl = new summaryTable();
+		pg.add((doc.create('h4', 'summary_table_title')).text("Summary:"));
+		pg.add(this.sumtbl.tbl);
+	}
+	
+	/*
+	 * Runs all of the tests. This clears the results and summary table 
+	 * and then calls the test runner run method.
+	 */
+	public runTests()
+	{
+		console.info('Clear existing results ...');
+		this.restbl.clear();
+		this.sumtbl.clear();
+		console.info('Starting unit tests ...');
+		this.runner.run();
+	}
+	
+	/***********************************************************************
+	 * This very long method adds all tests to the test runner object.
+	 **********************************************************************/
+	public addTests()
+	{
+		this.runner
+			// lang.type()
+			.add(new jstest("lang", "lang.type(): Checking null.", ::"langTypeNull"))
+			.add(new jstest("lang", "lang.type(): Checking bool.", ::"langTypeBool"))
+			.add(new jstest("lang", "lang.type(): Checking int.", ::"langTypeInt"))
+			.add(new jstest("lang", "lang.type(): Checking double.", ::"langTypeDouble"))
+			.add(new jstest("lang", "lang.type(): Checking string.", ::"langTypeString"))
+			.add(new jstest("lang", "lang.type(): Checking list.", ::"langTypeList"))
+			.add(new jstest("lang", "lang.type(): Checking map.", ::"langTypeMap"))
+			.add(new jstest("lang", "lang.type(): Checking object.", ::"langTypeObj"))
+			
+			// lang instanceof
+			.add(new jstest("lang", "instanceof: Checking bool.", ::"langInstanceofBool"))
+			.add(new jstest("lang", "instanceof: Checking string.", ::"langInstanceofString"))
+			.add(new jstest("lang", "instanceof: Checking object.", ::"langInstanceofObj"))
+			.add(new jstest("lang", "instanceof: Checking extended object.", ::"langInstanceofExtObj"))
+			
+			// lang.call()
+			.add(new jstest("lang", "lang.call(): Calling callback.", ::"langCallCallback"))
+			
+			// parser local tests
+			.add(new jstest("parser", "Assign local null.", ::"parserLocalAssignNull"))
+			.add(new jstest("parser", "Assign local bool.", ::"parserLocalAssignBool"))
+			.add(new jstest("parser", "Assign local int.", ::"parserLocalAssignInt"))
+			.add(new jstest("parser", "Assign local double.", ::"parserLocalAssignDouble"))
+			.add(new jstest("parser", "Assign local string.", ::"parserLocalAssignString"))
+			.add(new jstest("parser", "Assign local list.", ::"parserLocalAssignList"))
+			.add(new jstest("parser", "Assign local map.", ::"parserLocalAssignMap"))
+			.add(new jstest("parser", "Assign local object.", ::"parserLocalAssignObj"))
+			
+			// parser member tests
+			.add(new jstest("parser", "Assign member null.", ::"parserMemAssignNull"))
+			.add(new jstest("parser", "Assign member bool.", ::"parserMemAssignBool"))
+			.add(new jstest("parser", "Assign member int.", ::"parserMemAssignInt"))
+			.add(new jstest("parser", "Assign member double.", ::"parserMemAssignDouble"))
+			.add(new jstest("parser", "Assign member string.", ::"parserMemAssignString"))
+			.add(new jstest("parser", "Assign member list.", ::"parserMemAssignList"))
+			.add(new jstest("parser", "Assign member map.", ::"parserMemAssignMap"))
+			.add(new jstest("parser", "Assign member object.", ::"parserMemAssignObj"))
+			
+			// parser member definition
+			.add(new jstest("parser", "Member definition blank.", ::"parserMemDefBlank"))
+			.add(new jstest("parser", "Member definition null.", ::"parserMemDefNull"))
+			.add(new jstest("parser", "Member definition bool.", ::"parserMemDefBool"))
+			.add(new jstest("parser", "Member definition int.", ::"parserMemDefInt"))
+			.add(new jstest("parser", "Member definition double.", ::"parserMemDefDouble"))
+			.add(new jstest("parser", "Member definition string.", ::"parserMemDefString"))
+			.add(new jstest("parser", "Member definition list.", ::"parserMemDefList"))
+			.add(new jstest("parser", "Member definition map.", ::"parserMemDefMap"))
+			
+			// + oper
+			.add(new jstest("parser", "(+ operator) Bool plus bool.", ::"operBoolPlusBool"))
+			.add(new jstest("parser", "(+ operator) Bool plus int.", ::"operBoolPlusInt"))
+			.add(new jstest("parser", "(+ operator) Bool plus double.", ::"operBoolPlusDouble"))
+			.add(new jstest("parser", "(+ operator) Int plus bool.", ::"operIntPlusBool"))
+			.add(new jstest("parser", "(+ operator) Int plus int.", ::"operIntPlusInt"))
+			.add(new jstest("parser", "(+ operator) Int plus double.", ::"operIntPlusDouble"))
+			.add(new jstest("parser", "(+ operator) Double plus bool.", ::"operDoublePlusBool"))
+			.add(new jstest("parser", "(+ operator) Double plus int.", ::"operDoublePlusInt"))
+			.add(new jstest("parser", "(+ operator) Double plus double.", ::"operDoublePlusDouble"))
+			.add(new jstest("parser", "(+ operator) String plus null.", ::"operStringPlusNull"))
+			.add(new jstest("parser", "(+ operator) String plus bool.", ::"operStringPlusBool"))
+			.add(new jstest("parser", "(+ operator) String plus int.", ::"operStringPlusInt"))
+			.add(new jstest("parser", "(+ operator) String plus double.", ::"operStringPlusDouble"))
+			.add(new jstest("parser", "(+ operator) String plus string.", ::"operStringPlusString"))
+			.add(new jstest("parser", "(+ operator) Null plus string.", ::"operNullPlusString"))
+			.add(new jstest("parser", "(+ operator) Bool plus string.", ::"operBoolPlusString"))
+			.add(new jstest("parser", "(+ operator) Int plus string.", ::"operIntPlusString"))
+			.add(new jstest("parser", "(+ operator) Double plus string.", ::"operDoublePlusString"))
+			// - oper
+			.add(new jstest("parser", "(- operator) Bool plus bool.", ::"operBoolMinusBool"))
+			.add(new jstest("parser", "(- operator) Bool plus int.", ::"operBoolMinusInt"))
+			.add(new jstest("parser", "(- operator) Bool plus double.", ::"operBoolMinusDouble"))
+			.add(new jstest("parser", "(- operator) Int plus bool.", ::"operIntMinusBool"))
+			.add(new jstest("parser", "(- operator) Int plus int.", ::"operIntMinusInt"))
+			.add(new jstest("parser", "(- operator) Int plus double.", ::"operIntMinusDouble"))
+			.add(new jstest("parser", "(- operator) Double plus bool.", ::"operDoubleMinusBool"))
+			.add(new jstest("parser", "(- operator) Double plus int.", ::"operDoubleMinusInt"))
+			.add(new jstest("parser", "(- operator) Double plus double.", ::"operDoubleMinusDouble"))
+			// * oper
+			.add(new jstest("parser", "(* operator) Bool times bool.", ::"operBoolTimesBool"))
+			.add(new jstest("parser", "(* operator) Bool times int.", ::"operBoolTimesInt"))
+			.add(new jstest("parser", "(* operator) Bool times double.", ::"operBoolTimesDouble"))
+			.add(new jstest("parser", "(* operator) Int times bool.", ::"operIntTimesBool"))
+			.add(new jstest("parser", "(* operator) Int times int.", ::"operIntTimesInt"))
+			.add(new jstest("parser", "(* operator) Int times double.", ::"operIntTimesDouble"))
+			.add(new jstest("parser", "(* operator) Double times bool.", ::"operDoubleTimesBool"))
+			.add(new jstest("parser", "(* operator) Double times int.", ::"operDoubleTimesInt"))
+			.add(new jstest("parser", "(* operator) Double times double.", ::"operDoubleTimesDouble"))
+			// / oper
+			.add(new jstest("parser", "(/ operator) Bool divide bool.", ::"operBoolDivideBool"))
+			.add(new jstest("parser", "(/ operator) Bool divide int.", ::"operBoolDivideInt"))
+			.add(new jstest("parser", "(/ operator) Bool divide double.", ::"operBoolDivideDouble"))
+			.add(new jstest("parser", "(/ operator) Int divide bool.", ::"operIntDivideBool"))
+			.add(new jstest("parser", "(/ operator) Int divide int.", ::"operIntDivideInt"))
+			.add(new jstest("parser", "(/ operator) Int divide double.", ::"operIntDivideDouble"))
+			.add(new jstest("parser", "(/ operator) Double divide bool.", ::"operDoubleDivideBool"))
+			.add(new jstest("parser", "(/ operator) Double divide int.", ::"operDoubleDivideInt"))
+			.add(new jstest("parser", "(/ operator) Double divide double.", ::"operDoubleDivideDouble"))
+			// % oper
+			.add(new jstest("parser", "(% operator) Bool modulus bool.", ::"operBoolModulusBool"))
+			.add(new jstest("parser", "(% operator) Bool modulus int.", ::"operBoolModulusInt"))
+			.add(new jstest("parser", "(% operator) Bool modulus double.", ::"operBoolModulusDouble"))
+			.add(new jstest("parser", "(% operator) Int modulus bool.", ::"operIntModulusBool"))
+			.add(new jstest("parser", "(% operator) Int modulus int.", ::"operIntModulusInt"))
+			.add(new jstest("parser", "(% operator) Int modulus double.", ::"operIntModulusDouble"))
+			.add(new jstest("parser", "(% operator) Double modulus bool.", ::"operDoubleModulusBool"))
+			.add(new jstest("parser", "(% operator) Double modulus int.", ::"operDoubleModulusInt"))
+			.add(new jstest("parser", "(% operator) Double modulus double.", ::"operDoubleModulusDouble"))
+			// # oper
+			.add(new jstest("parser", "(# operator) Local list count.", ::"operLocalListCount"))
+			.add(new jstest("parser", "(# operator) Local map count.", ::"operLocalMapCount"))
+			.add(new jstest("parser", "(# operator) Member list count.", ::"operMemberListCount"))
+			.add(new jstest("parser", "(# operator) Member map count.", ::"operMemberMapCount"))
+			
+			// List operations
+			.add(new jstest("parser", "(list operations) List local append null.", ::"listLocalAppendNull"))
+			.add(new jstest("parser", "(list operations) List local append bool.", ::"listLocalAppendBool"))
+			.add(new jstest("parser", "(list operations) List local append int.", ::"listLocalAppendInt"))
+			.add(new jstest("parser", "(list operations) List local append double.", ::"listLocalAppendDouble"))
+			.add(new jstest("parser", "(list operations) List local append string.", ::"listLocalAppendString"))
+			.add(new jstest("parser", "(list operations) List local append local list.", ::"listLocalAppendLocalList"))
+			.add(new jstest("parser", "(list operations) List local append local map.", ::"listLocalAppendLocalMap"))
+			.add(new jstest("parser", "(list operations) List member append null.", ::"listMemberAppendNull"))
+			.add(new jstest("parser", "(list operations) List member append bool.", ::"listMemberAppendBool"))
+			.add(new jstest("parser", "(list operations) List member append int.", ::"listMemberAppendInt"))
+			.add(new jstest("parser", "(list operations) List member append double.", ::"listMemberAppendDouble"))
+			.add(new jstest("parser", "(list operations) List member append string.", ::"listMemberAppendString"))
+			.add(new jstest("parser", "(list operations) List member append local deref with var.", ::"listMemberAppendLocalVarRef"))
+			.add(new jstest("parser", "(list operations) List local new list.", ::"listLocalNewList"))
+			.add(new jstest("parser", "(list operations) List local get by local var.", ::"listLocalGetLocalVar"))
+		
+			// Map operations
+			.add(new jstest("parser", "(map operations) Map member assign string.", ::"mapMemberSetString"))
+			.add(new jstest("parser", "(map operations) Map member assign local var.", ::"mapMemberSetLocalVar"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign bool.", ::"mapLocalSetStringAssignBool"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign int.", ::"mapLocalSetStringAssignInt"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign double.", ::"mapLocalSetStringAssignDouble"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign string.", ::"mapLocalSetStringAssignString"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign list.", ::"mapLocalSetStringAssignList"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign var list.", ::"mapLocalSetStringAssignVarList"))
+			.add(new jstest("parser", "(map operations) Map local set string and re-assign var list.", ::"mapLocalSetStringReAssignVarList"))
+			.add(new jstest("parser", "(map operations) Map local set string and assign map.", ::"mapLocalSetStringAssignMap"))
+			.add(new jstest("parser", "(map operations) Map local set string and re-assign var list.", ::"mapLocalSetStringReAssignVarMap"))
+			.add(new jstest("parser", "(map operations) Map local set object ref and assign string.", ::"mapLocalObjRefAssignString"))
+			.add(new jstest("parser", "(map operations) Map local new map.", ::"mapLocalNewMap"))
+			.add(new jstest("parser", "(map operations) Map local set/get by local var.", ::"mapLocalSetGetLocalVar"))
+			
+			// int tests
+			.add(new jstest("lang", "(lang int) Int max val.", ::"intMaxVal"))
+			.add(new jstest("lang", "(lang int) Int min val.", ::"intMinVal"))
+			.add(new jstest("lang", "(lang int) Int to double.", ::"intToDouble"))
+			.add(new jstest("lang", "(lang int) Int to bool.", ::"intToBool"))
+			.add(new jstest("lang", "(lang int) Int to string.", ::"intToString"))
+			.add(new jstest("lang", "(lang int) Int compare.", ::"intCompare"))
+			.add(new jstest("lang", "(lang int) Int number leading zeros.", ::"intNumLeadingZeros"))
+			.add(new jstest("lang", "(lang int) Int number trailing zeros.", ::"intNumTrailingZeros"))
+			.add(new jstest("lang", "(lang int) Int parse.", ::"intParse"))
+			.add(new jstest("lang", "(lang int) Int reverse.", ::"intReverse"))
+			.add(new jstest("lang", "(lang int) Int rotate left.", ::"intRotateLeft"))
+			.add(new jstest("lang", "(lang int) Int rotate right.", ::"intRotateRight"))
+			.add(new jstest("lang", "(lang int) Int signum.", ::"intSignum"))
+			.add(new jstest("lang", "(lang int) Int to binary.", ::"intToBinary"))
+			.add(new jstest("lang", "(lang int) Int to hex.", ::"intToHex"))
+			.add(new jstest("lang", "(lang int) Int to octal.", ::"intToOctal"))
+			
+			// bool tests
+			.add(new jstest("lang", "(lang bool) Bool to int.", ::"boolToInt"))
+			.add(new jstest("lang", "(lang bool) Bool to double.", ::"boolToDouble"))
+			.add(new jstest("lang", "(lang bool) Bool to string.", ::"boolToString"))
+			.add(new jstest("lang", "(lang bool) Bool compare.", ::"boolCompare"))
+			.add(new jstest("lang", "(lang bool) Bool parse.", ::"boolParse"))
+			
+			// double tests
+			.add(new jstest("lang", "(lang double) Double max exponent.", ::"doubleMaxExponent"))
+			.add(new jstest("lang", "(lang double) Double min exponent.", ::"doubleMinExponent"))
+			.add(new jstest("lang", "(lang double) Double max value.", ::"doubleMaxValue"))
+			.add(new jstest("lang", "(lang double) Double min value.", ::"doubleMinValue"))
+			.add(new jstest("lang", "(lang double) Double min normal value.", ::"doubleMinNormalValue"))
+			.add(new jstest("lang", "(lang double) Double NaN value.", ::"doubleNaNValue"))
+			.add(new jstest("lang", "(lang double) Double negative infinity value.", ::"doubleNegInfinity"))
+			.add(new jstest("lang", "(lang double) Double positive infinity value.", ::"doublePosInfinity"))
+			.add(new jstest("lang", "(lang double) Double size value.", ::"doubleSize"))
+			.add(new jstest("lang", "(lang double) Double to int.", ::"doubleToInt"))
+			.add(new jstest("lang", "(lang double) Double to bool.", ::"doubleToBool"))
+			.add(new jstest("lang", "(lang double) Double to string.", ::"doubleToString"))
+			.add(new jstest("lang", "(lang double) Double compare.", ::"doubleCompare"))
+			.add(new jstest("lang", "(lang double) Double is infinite.", ::"doubleIsInfinite"))
+			.add(new jstest("lang", "(lang double) Double is NaN.", ::"doubleIsNaN"))
+			.add(new jstest("lang", "(lang double) Double parse.", ::"doubleParse"))
+			.add(new jstest("lang", "(lang double) Double to hex.", ::"doubleToHex"))
+			
+			// string tests
+			.add(new jstest("lang", "(lang string) String char at.", ::"stringCharAt"))
+			.add(new jstest("lang", "(lang string) String code point at.", ::"stringCodePointAt"))
+			.add(new jstest("lang", "(lang string) String code point before.", ::"stringCodePointBefore"))
+			.add(new jstest("lang", "(lang string) String code point count.", ::"stringCodePointCount"))
+			.add(new jstest("lang", "(lang string) String compare.", ::"stringCompare"))
+			.add(new jstest("lang", "(lang string) String compare ignore case.", ::"stringCompareICase"))
+			.add(new jstest("lang", "(lang string) String concat.", ::"stringConcat"))
+			.add(new jstest("lang", "(lang string) String contains.", ::"stringContains"))
+			.add(new jstest("lang", "(lang string) String ends with.", ::"stringEndsWith"))
+			.add(new jstest("lang", "(lang string) String equals.", ::"stringEquals"))
+			.add(new jstest("lang", "(lang string) String equals ignore case.", ::"stringEqualsICase"))
+			.add(new jstest("lang", "(lang string) String index of.", ::"stringIndexOf"))
+			.add(new jstest("lang", "(lang string) String index of start.", ::"stringIndexOfStart"))
+			.add(new jstest("lang", "(lang string) String is empty.", ::"stringIsEmpty"))
+			.add(new jstest("lang", "(lang string) String last index of.", ::"stringLastIndexOf"))
+			.add(new jstest("lang", "(lang string) String last index of start.", ::"stringLastIndexOfStart"))
+			.add(new jstest("lang", "(lang string) String matches.", ::"stringMatches"))
+			.add(new jstest("lang", "(lang string) String replace.", ::"stringReplace"))
+			.add(new jstest("lang", "(lang string) String replace first regex.", ::"stringReplaceFirstRegex"))
+			.add(new jstest("lang", "(lang string) String replace regex.", ::"stringReplaceRegex"))
+			.add(new jstest("lang", "(lang string) String explode.", ::"stringExplode"))
+			.add(new jstest("lang", "(lang string) String implode.", ::"stringImplode"))
+			.add(new jstest("lang", "(lang string) String starts with.", ::"stringStartsWith"))
+			.add(new jstest("lang", "(lang string) String sub string.", ::"stringSubstr"))
+			.add(new jstest("lang", "(lang string) String sub string end.", ::"stringSubstrEnd"))
+			.add(new jstest("lang", "(lang string) String to lower case.", ::"stringToLower"))
+			.add(new jstest("lang", "(lang string) String to upper case.", ::"stringToUpper"))
+			.add(new jstest("lang", "(lang string) String trim.", ::"stringTrim"))
+			
+			// list tests
+			.add(new jstest("lang", "(lang list) List create.", ::"listCreate"))
+			.add(new jstest("lang", "(lang list) List add.", ::"listAdd"))
+			.add(new jstest("lang", "(lang list) List add all.", ::"listAddAll"))
+			.add(new jstest("lang", "(lang list) List add all at.", ::"listAddAllAt"))
+			.add(new jstest("lang", "(lang list) List clone.", ::"listClone"))
+			.add(new jstest("lang", "(lang list) List contains object reference.", ::"listContainsObjRef"))
+			.add(new jstest("lang", "(lang list) List contains.", ::"listContains"))
+			.add(new jstest("lang", "(lang list) List get.", ::"listGet"))
+			.add(new jstest("lang", "(lang list) List index of.", ::"listIndexOf"))
+			.add(new jstest("lang", "(lang list) List is empty.", ::"listIsEmpty"))
+			.add(new jstest("lang", "(lang list) List remove.", ::"listRemove"))
+			.add(new jstest("lang", "(lang list) List remove at.", ::"listRemoveAt"))
+			.add(new jstest("lang", "(lang list) List remove all.", ::"listRemoveAll"))
+			.add(new jstest("lang", "(lang list) List retain all.", ::"listRetainAll"))
+			.add(new jstest("lang", "(lang list) List set.", ::"listSet"))
+			.add(new jstest("lang", "(lang list) List size.", ::"listSize"))
+			.add(new jstest("lang", "(lang list) List sub list.", ::"listSubList"))
+			.add(new jstest("lang", "(lang list) List sort.", ::"listSort"))
+			.add(new jstest("lang", "(lang list) List sort ascending.", ::"listSortAsc"))
+			.add(new jstest("lang", "(lang list) List sort custom.", ::"listSortCustom"))
+			.add(new jstest("lang", "(lang list) List clear.", ::"listClear"))
+			
+			// map tests
+			.add(new jstest("lang", "(lang map) Map create.", ::"mapCreate"))
+			.add(new jstest("lang", "(lang map) Map contains key.", ::"mapContainsKey"))
+			.add(new jstest("lang", "(lang map) Map contains value.", ::"mapContainsValue"))
+			.add(new jstest("lang", "(lang map) Map get.", ::"mapGet"))
+			.add(new jstest("lang", "(lang map) Map is empty.", ::"mapIsEmpty"))
+			.add(new jstest("lang", "(lang map) Map key set.", ::"mapKeySet"))
+			.add(new jstest("lang", "(lang map) Map put.", ::"mapPut"))
+			.add(new jstest("lang", "(lang map) Map put all.", ::"mapPutAll"))
+			.add(new jstest("lang", "(lang map) Map put if absent.", ::"mapPutIfAbsent"))
+			.add(new jstest("lang", "(lang map) Map remove.", ::"mapRemove"))
+			.add(new jstest("lang", "(lang map) Map size.", ::"mapSize"))
+			.add(new jstest("lang", "(lang map) Map values.", ::"mapValues"))
+			.add(new jstest("lang", "(lang map) Map clear.", ::"mapClear"))
+			
+			// jnode tests
+			.add(new jstest("json", "(jnode) Instantiate jnode object.", ::"instantiateJnodeObject"))
+			.add(new jstest("json", "(jnode) Check if array.", ::"jnodeIsArray"))
+			.add(new jstest("json", "(jnode) Put/Get bool value.", ::"jnodePutGetBool"))
+			.add(new jstest("json", "(jnode) Put/Get int value.", ::"jnodePutGetInt"))
+			.add(new jstest("json", "(jnode) Put/Get double value.", ::"jnodePutGetDouble"))
+			.add(new jstest("json", "(jnode) Put/Get string value.", ::"jnodePutGetString"))
+			.add(new jstest("json", "(jnode) Put/Get list value.", ::"jnodePutGetList"))
+			.add(new jstest("json", "(jnode) Put/Get map value.", ::"jnodePutGetMap"))
+			.add(new jstest("json", "(jnode) Get or null with not null value.", ::"jnodeGetOrNullNotNull"))
+			.add(new jstest("json", "(jnode) Get or null with null value.", ::"jnodeGetOrNullNull"))
+			.add(new jstest("json", "(jnode) Get cali object set.", ::"jnodeGetCali"))
+			.add(new jstest("json", "(jnode) Get key set.", ::"jnodeGetKeySet"))
+			.add(new jstest("json", "(jnode) To string function.", ::"jnodeToString"))
+			
+			// jarray tests
+			.add(new jstest("json", "(jarray) Instantiate jarray object.", ::"instantiateJarrayObject"))
+			.add(new jstest("json", "(jarray) Put/Get jnode object.", ::"jarrayPutGetJnode"))
+			.add(new jstest("json", "(jarray) Size function.", ::"jarraySize"))
+			.add(new jstest("json", "(jarray) Check if array.", ::"jarrayIsArray"))
+			.add(new jstest("json", "(jarray) Get cali object set.", ::"jarrayGetCali"))
+			.add(new jstest("json", "(jarray) To string function.", ::"jarrayToString"))
+			
+			// json tests
+			.add(new jstest("json", "(json) Parse string.", ::"jsonParseString"))
+			.add(new jstest("json", "(json) Save and parse file.", ::"jsonSaveParseFile"))
+			
+			// httpClient tests
+			.add(new jstest("httpClient", "(httpClient) HTTP client instantiate.", ::"httpClientInstantiate"))
+			.add(new jstest("httpClient", "(httpClient) HTTP client get page.", ::"httpClientGetPage"))
+			.add(new jstest("httpClient", "(httpClient) HTTP client do post.", ::"httpClientDoPost"))
+			.add(new jstest("httpClient", "(httpClient) HTTP client set/get connection request timeout.", ::"httpClientSetConnectionRequestTimeout"))
+			.add(new jstest("httpClient", "(httpClient) HTTP client set/get connection timeout.", ::"httpClientSetConnectTimeout"))
+			.add(new jstest("httpClient", "(httpClient) HTTP client set/get socket timeout.", ::"httpClientSetSocketTimeout"))
+		;
+	}
+	
+	
+	/***********************************************************************
+	 * Actual test methods.
+	 * All of the following methods below this point are the test methods 
+	 * for each browser unit test. Much of these have been coppied with 
+	 * minor modifications from the cali-lang standard unit tests.
+	 **********************************************************************/
+	// lang.type()
+	public langTypeNull() { return test.expect(lang.type(null), 'null'); }
+	public langTypeBool() { return test.expect(lang.type(true), 'bool'); }
+	public langTypeInt() { return test.expect(lang.type(123), 'int'); }
+	public langTypeDouble() { return test.expect(lang.type(123.123), 'double'); }
+	public langTypeString() { return test.expect(lang.type('hi'), 'string'); }
+	public langTypeList() { return test.expect(lang.type([]), 'list'); }
+	public langTypeMap() { return test.expect(lang.type({}), 'map'); }
+	public langTypeObj() { to = new tobj(); return test.expect(lang.type(to), 'tobj'); }
+	
+	// instanceof
+	public langInstanceofBool() { return test.expect(true instanceof 'bool', true); }
+	public langInstanceofString() { return test.expect('hi' instanceof 'string', true); }
+	public langInstanceofObj() { to = new tobj(); return test.expect(to instanceof 'tobj', true); }
+	public langInstanceofExtObj() { to = new extObj(); return test.expect(to instanceof 'tobj', true); }
+	
+	// lang.call()
+	public langCallCallback() { obj = new extObj(); cb = obj.getCb(); return test.expect(lang.call(cb, 'txt'), 'txt'); }
+	
+	// parser local tests
+	public parserLocalAssignNull() { v = null; return test.expectNull(v); }
+	public parserLocalAssignBool() { v = true; return test.expectBool(v); }
+	public parserLocalAssignInt() { v = 123; return test.expectInt(v); }
+	public parserLocalAssignDouble() { v = 123.456; return test.expectDouble(v); }
+	public parserLocalAssignString() { v = 'hi'; return test.expectString(v); }
+	public parserLocalAssignList() { v = []; return test.expectList(v); }
+	public parserLocalAssignMap() { v = {}; return test.expectMap(v); }
+	public parserLocalAssignObj() { v = new tobj(); return test.expectObject(v, 'tobj'); }
+	
+	// parser member tests
+	public parserMemAssignNull() { this.memb = null; return test.expectNull(this.memb); }
+	public parserMemAssignBool() { this.memb = true; return test.expectBool(this.memb); }
+	public parserMemAssignInt() { this.memb = 123; return test.expectInt(this.memb); }
+	public parserMemAssignDouble() { this.memb = 123.123; return test.expectDouble(this.memb); }
+	public parserMemAssignString() { this.memb = 'hi'; return test.expectString(this.memb); }
+	public parserMemAssignList() { this.memb = []; return test.expectList(this.memb); }
+	public parserMemAssignMap() { this.memb = {}; return test.expectMap(this.memb); }
+	public parserMemAssignObj() { this.memb = new tobj(); return test.expectObject(this.memb, 'tobj'); }
+	
+	// parser member definition
+	public parserMemDefBlank() { return test.expectNull(this.memBlank); }
+	public parserMemDefNull() { return test.expectNull(this.memNull); }
+	public parserMemDefBool() { return test.expectBool(this.memBool); }
+	public parserMemDefInt() { return test.expectInt(this.memInt); }
+	public parserMemDefDouble() { return test.expectDouble(this.memDouble); }
+	public parserMemDefString() { return test.expectString(this.memString); }
+	public parserMemDefList() { return test.expectList(this.memList); }
+	public parserMemDefMap() { return test.expectMap(this.memMap); }
+	
+	/**********************************************************************
+	 * Basic operator tests
+	 *********************************************************************/
+	 // Numeric +
+	 public operBoolPlusBool() { v = true + true; return test.expect(v, 2); }
+	 public operBoolPlusInt() { v = true + 5; return test.expect(v, 6); }
+	 public operBoolPlusDouble() { v = true + 5.0; return test.expect(v, 6.0); }
+	 public operIntPlusBool() { v = 5 + true; return test.expect(v, 6); }
+	 public operIntPlusInt() { v = 5 + 10; return test.expect(v, 15); }
+	 public operIntPlusDouble() { v = 5 + 10.0; return test.expect(v, 15.0); }
+	 public operDoublePlusBool() { v = 5.0 + true; return test.expect(v, 6.0); }
+	 public operDoublePlusInt() { v = 5.0 + 10; return test.expect(v, 15.0); }
+	 public operDoublePlusDouble() { v = 5.0 + 10.0; return test.expect(v, 15.0); }
+	 // String +
+	 public operStringPlusNull() { v = "is " + null; return test.expect(v, "is null"); }
+	 public operStringPlusBool() { v = "is " + true; return test.expect(v, "is true"); }
+	 public operStringPlusInt() { v = "is " + 1; return test.expect(v, "is 1"); }
+	 public operStringPlusDouble() { v = "is " + 123.456; return test.expect(v, "is 123.456"); }
+	 public operStringPlusString() { v = "is " + "string"; return test.expect(v, "is string"); }
+	 public operNullPlusString() { v = null + " is"; return test.expect(v, "null is"); }
+	 public operBoolPlusString() { v = true + " is"; return test.expect(v, "true is"); }
+	 public operIntPlusString() { v = 1 + " is"; return test.expect(v, "1 is"); }
+	 public operDoublePlusString() { v = 123.456 + " is"; return test.expect(v, "123.456 is"); }
+	 // Numeric -
+	 public operBoolMinusBool() { v = true - true; return test.expect(v, 0); }
+	 public operBoolMinusInt() { v = true - 2; return test.expect(v, -1); }
+	 public operBoolMinusDouble() { v = true - 2.0; return test.expect(v, -1.0); }
+	 public operIntMinusBool() { v = 2 - true; return test.expect(v, 1); }
+	 public operIntMinusInt() { v = 2 - 1; return test.expect(v, 1); }
+	 public operIntMinusDouble() { v = 2 - 1.0; return test.expect(v, 1.0); }
+	 public operDoubleMinusBool() { v = 2.0 - true; return test.expect(v, 1.0); }
+	 public operDoubleMinusInt() { v = 2.0 - 1; return test.expect(v, 1.0); }
+	 public operDoubleMinusDouble() { v = 2.0 - 1.0; return test.expect(v, 1.0); }
+	 // Numeric *
+	 public operBoolTimesBool() { v = true * true; return test.expect(v, 1); }
+	 public operBoolTimesInt() { v = true * 10; return test.expect(v, 10); }
+	 public operBoolTimesDouble() { v = true * 10.0; return test.expect(v, 10.0); }
+	 public operIntTimesBool() { v = 10 * true; return test.expect(v, 10); }
+	 public operIntTimesInt() { v = 10 * 2; return test.expect(v, 20); }
+	 public operIntTimesDouble() { v = 10 * 2.0; return test.expect(v, 20.0); }
+	 public operDoubleTimesBool() { v = 2.0 * true; return test.expect(v, 2.0); }
+	 public operDoubleTimesInt() { v = 2.0 * 2; return test.expect(v, 4.0); }
+	 public operDoubleTimesDouble() { v = 2.0 * 2.0; return test.expect(v, 4.0); }
+	 // Numeric /
+	 public operBoolDivideBool() { v = true / true; return test.expect(v, 1); }
+	 public operBoolDivideInt() { v = true / 1; return test.expect(v, 1); }
+	 public operBoolDivideDouble() { v = true / 1.0; return test.expect(v, 1.0); }
+	 public operIntDivideBool() { v = 10 / true; return test.expect(v, 10); }
+	 public operIntDivideInt() { v = 10 / 2; return test.expect(v, 5); }
+	 public operIntDivideDouble() { v = 10 / 2.0; return test.expect(v, 5.0); }
+	 public operDoubleDivideBool() { v = 2.0 / true; return test.expect(v, 2.0); }
+	 public operDoubleDivideInt() { v = 2.0 / 2; return test.expect(v, 1.0); }
+	 public operDoubleDivideDouble() { v = 2.0 / 2.0; return test.expect(v, 1.0); }
+	 // Numeric %
+	 public operBoolModulusBool() { v = true % true; return test.expect(v, 0.0); }
+	 public operBoolModulusInt() { v = true % 1; return test.expect(v, 0.0); }
+	 public operBoolModulusDouble() { v = true % 1.0; return test.expect(v, 0.0); }
+	 public operIntModulusBool() { v = 10 % true; return test.expect(v, 0.0); }
+	 public operIntModulusInt() { v = 10 % 4; return test.expect(v, 2); }
+	 public operIntModulusDouble() { v = 10 % 4.0; return test.expect(v, 2.0); }
+	 public operDoubleModulusBool() { v = 2.0 % true; return test.expect(v, 0.0); }
+	 public operDoubleModulusInt() { v = 2.0 % 2; return test.expect(v, 0.0); }
+	 public operDoubleModulusDouble() { v = 2.0 % 2.0; return test.expect(v, 0.0); }
+	 // Count #
+	 public operLocalListCount() { v = []; v @= "Tyler"; return test.expect(#v - 1, 0); }
+	 public operLocalMapCount() { v = {}; v['char'] = "Tyler"; return test.expect(#v, 1); }
+	 public operMemberListCount() { this.memList = ['one', 'two', 'three']; return test.expect(#this.memList, 3); }
+	 public operMemberMapCount() { this.memMap = { 'one' : 1, 'two' : 2, 'three' : 3 }; return test.expect(#this.memMap, 3); }
+	 
+	 
+	 /**********************************************************************
+	 * List operations.
+	 *********************************************************************/
+	 public listLocalAppendNull() { tmp = []; tmp @= null; return test.expectNull(tmp[0]); }
+	 public listLocalAppendBool() { tmp = []; tmp @= true; return test.expect(tmp[0], true); }
+	 public listLocalAppendInt() { tmp = []; tmp @= 32; return test.expect(tmp[0], 32); }
+	 public listLocalAppendDouble() { tmp = []; tmp @= 3.1514; return test.expect(tmp[0], 3.1514); }
+	 public listLocalAppendString() { tmp = []; tmp @= "Tyler"; return test.expect(tmp[0], "Tyler"); }
+	 public listLocalAppendLocalList() { tmp = []; lst = []; lst @= "Tyler"; tmp @= lst; return test.expect(tmp[0][0], "Tyler"); }
+	 public listLocalAppendLocalMap() { tmp = []; mp = {}; mp['char'] = "Tyler"; tmp @= mp; return test.expect(tmp[0]['char'], "Tyler"); }
+	 public listMemberAppendNull() { this.memList @= null; return test.expect(this.memList[3], null); }
+	 public listMemberAppendBool() { this.memList @= true; return test.expect(this.memList[4], true); }
+	 public listMemberAppendInt() { this.memList @= 32; return test.expect(this.memList[5], 32); }
+	 public listMemberAppendDouble() { this.memList @= 3.1415; return test.expect(this.memList[6], 3.1415); }
+	 public listMemberAppendString() { this.memList @= "Tyler"; return test.expect(this.memList[7], "Tyler"); }
+	 public listMemberAppendLocalVarRef() { v = 8; this.memList @= "Durden"; return test.expect(this.memList[v], "Durden"); }
+	 public listLocalNewList()
+	 {
+	 	lst = [1, 2, 3, 'four', [1, 2, 3]];
+	 	return test.expect(lst[0] == 1 && lst[1] == 2 && lst[2] == 3 && lst[3] == 'four' && lst[4] instanceof 'list', true);
+	 }
+	 public listLocalGetLocalVar()
+	 {
+	 	lst = ['one', 'two', 'three'];
+	 	ind = 1;
+	 	return test.expect(lst[ind], 'two');
+	 }
+	 
+	 /**********************************************************************
+	 * Map operations.
+	 *********************************************************************/
+	 public mapMemberSetString() { this.memMap['name'] = "Tyler"; return test.expect(this.memMap['name'], "Tyler"); }
+	 public mapMemberSetLocalVar()
+	 {
+	 	v = 'lname';
+	 	this.memMap[v] = "Durden";
+	 	return test.expect(this.memMap[v], "Durden");
+	 }
+	 public mapLocalSetStringAssignBool() { tmp = {}; tmp['val'] = true; return test.expect(tmp['val'], true); }
+	 public mapLocalSetStringReAssignBool() { tmp = {}; tmp['val'] = true; tmp['val'] = false; return test.expect(tmp['val'], false); }
+	 public mapLocalSetStringAssignInt() { tmp = {}; tmp['val'] = 10; return test.expect(tmp['val'], 10); }
+	 public mapLocalSetStringAssignDouble() { tmp = {}; tmp['val'] = 123.456; return test.expect(tmp['val'], 123.456); }
+	 public mapLocalSetStringAssignString() { tmp = {}; tmp['val'] = "test"; return test.expect(tmp['val'], "test"); }
+	 public mapLocalSetStringAssignList() { tmp = {}; tmp['val'] = []; return test.expectList(tmp['val']); }
+	 public mapLocalSetStringAssignVarList() { tmp = {}; lst = []; tmp['val'] = lst; return test.expectList(tmp['val']); }
+	 public mapLocalSetStringReAssignVarList() { tmp = {}; lst = []; tmp['val'] = lst; tmp['val'] = lst; return test.expectList(tmp['val']); }
+	 public mapLocalSetStringAssignMap() { tmp = {}; tmp['val'] = {}; return test.expectMap(tmp['val']); }
+	 public mapLocalSetStringReAssignVarMap() { tmp = {}; tmp['val'] = {}; tmp['val'] = {}; return test.expectMap(tmp['val']); }
+	 public mapLocalObjRefAssignString()
+	 {
+	 	tobj = new email();
+	 	tobj.address = 'name';
+	 	tmap = {};
+	 	tmap[tobj.address] = 'Tyler';
+	 	return test.expect(tmap[tobj.address], 'Tyler');
+	 }
+	 public mapLocalNewMap()
+	 {
+	 	tmp = 'three';
+	 	mp = { 'one': 1, 'two': 2, tmp: 3, 'four': 'something' };
+	 	return test.expect(mp['one'] == 1 && mp['two'] == 2 && mp['three'] == 3 && mp['four'] == 'something', true);
+	 }
+	 public mapLocalSetGetLocalVar()
+	 {
+	 	mp = {};
+	 	key = 'name';
+	 	mp[key] = 'Tyler';
+	 	return test.expect(mp[key], 'Tyler');
+	 }
+	 
+	 
+	/**********************************************************************
+	* int tests
+	*********************************************************************/
+	public intMaxVal() { return test.expect(int.maxVal(), 9007199254740991); }
+	public intMinVal() { return test.expect(int.minVal(), -9007199254740991); }
+	public intToDouble() { return test.expect(int.toDouble(32), 32.0); }
+	public intToBool() { return test.expect(int.toBool(1), true); }
+	public intToString() { return test.expect(int.toString(32), "32"); }
+	public intCompare() { return test.expect(int.compare(32, 32), 0); }
+	public intNumLeadingZeros() { return test.expect(int.numLeadingZeros(10), 60); }
+	public intNumTrailingZeros() { return test.expect(int.numTrailingZeros(10), 1); }
+	public intParse() { return test.expect(int.parse("32"), 32); }
+	public intReverse() { return test.expect(int.reverse(100), 2738188573441261568); }
+	public intRotateLeft() { return test.expect(int.rotateLeft(100, 2), 400); }
+	public intRotateRight() { return test.expect(int.rotateRight(100, 2), 25); }
+	public intSignum() { return test.expect(int.signum(-125), -1); }
+	public intToBinary() { return test.expect(int.toBinary(32), '100000'); }
+	public intToHex() { return test.expect(int.toHex(32), '20'); }
+	public intToOctal() { return test.expect(int.toOctal(32), '40'); }
+	
+	/**********************************************************************
+	 * bool tests
+	 *********************************************************************/
+	public boolToInt() { return test.expect(bool.toInt(true), 1); }
+	public boolToDouble() { return test.expect(bool.toDouble(true), 1.0); }
+	public boolToString() { return test.expect(bool.toString(true), 'true'); }
+	public boolCompare() { return test.expect(bool.compare(true, false), 1); }
+	public boolParse() { return test.expect(bool.parse('true'), true); }
+	
+	/**********************************************************************
+	 * double tests
+	 *********************************************************************/
+	public doubleMaxExponent() { return test.expect(double.maxExp(), 1023.0); }
+	public doubleMinExponent() { return test.expect(double.minExp(), -1022.0); }
+	public doubleMaxValue() { return test.expectInt(double.maxVal()); }			// will be an int ...
+	public doubleMinValue() { return test.expectDouble(double.minVal()); }
+	public doubleMinNormalValue() { return test.expectDouble(double.minNormal()); }
+	public doubleNaNValue() { return test.expectString(double.nanVal()); }
+	public doubleNegInfinity() { return test.expect(double.negInfinity() + '', '-Infinity'); }
+	public doublePosInfinity() { return test.expect(double.posInfinity() + '', 'Infinity'); }
+	public doubleSize() { return test.expect(double.size(), 53.0); }
+	public doubleToInt() { return test.expect(double.toInt(3.1415), 3); }
+	public doubleToBool() { return test.expect(double.toBool(1.0), true); }
+	public doubleToString() { return test.expect(double.toString(3.1415), '3.1415'); }
+	public doubleCompare() { return test.expect(double.compare(32.0, 24.0), 1); }
+	public doubleIsInfinite() { return test.expect(double.isInfinite(double.posInfinity()), true); }
+	public doubleIsNaN() { return test.expect(double.isNan(double.nanVal()), true); }
+	public doubleParse() { return test.expect(double.parse('3.1415'), 3.1415); }
+	public doubleToHex() { return test.expect(double.toHex(3.1415), '0x1.921cac083126fp1'); }
+	
+	/**********************************************************************
+	 * string tests
+	 *********************************************************************/
+	public stringCharAt() { return test.expect(string.charAt("Tyler", 1), 'y'); }
+	public stringCodePointAt() { return test.expect(string.codePointAt("Tyler", 1), 121); }
+	public stringCodePointBefore() { return test.expect(string.codePointBefore("Tyler", 1), 84); }
+	public stringCodePointCount() { return test.expect(string.codePointCount("Tyler", 0, 4), 4); }
+	public stringCompare() { return test.expect(string.compare("Ty", "Tyler") < 0, true); }
+	public stringCompareICase() { return test.expect(string.compareICase("Tyler", "tyler"), 0); }
+	public stringConcat() { return test.expect(string.concat("Ty", "ler"), "Tyler"); }
+	public stringContains() { return test.expect(string.contains("Tyler", "yl"), true); }
+	public stringEndsWith() { return test.expect(string.endsWith("Tyler", "er"), true); }
+	public stringEquals() { return test.expect(string.equals("Tyler", "Tyler"), true); }
+	public stringEqualsICase() { return test.expect(string.equalsICase("Tyler", "tyler"), true); }
+	public stringIndexOf() { return test.expect(string.indexOf("Tyler", "ler"), 2); }
+	public stringIndexOfStart() { return test.expect(string.indexOfStart("Tyler Durden", "e", 5), 10); }
+	public stringIsEmpty() { return test.expect(string.isEmpty("Tyler"), false); }
+	public stringLastIndexOf() { return test.expect(string.lastIndexOf("Tyler Durden", "e"), 10); }
+	public stringLastIndexOfStart() { return test.expect(string.lastIndexOfStart("Tyler Durden", "e", 5), 3); }
+	public stringMatches() { return test.expect(string.matches("Tyler", "^Ty.*"), true); }
+	public stringReplace() { return test.expect(string.replace("Tyler Durdon", "on", "en"), "Tyler Durden"); }
+	public stringReplaceFirstRegex() { return test.expect(string.replaceFirstRegex("Tyler", "T.", "Ty"), "Tyler"); }
+	public stringReplaceRegex() { return test.expect(string.replaceRegex("Tyler Durden", "e.", "on"), "Tylon Durdon"); }
+	public stringExplode() { return test.expect(string.explode("one,two,three", ",")[1], "two"); }
+	public stringImplode() { lst = []; lst @= "one"; lst @= "two"; lst @= "three"; return test.expect(string.implode(lst, "|"), "one|two|three"); }
+	public stringStartsWith() { return test.expect(string.startsWith("Tyler Durden", "Tyler "), true); }
+	public stringSubstr() { return test.expect(string.substr("Tyler", 2), "ler"); }
+	public stringSubstrEnd() { return test.expect(string.substr("Tyler", 2, 4), "le"); }
+	public stringToLower() { return test.expect(string.toLower("Tyler"), "tyler"); }
+	public stringToUpper() { return test.expect(string.toUpper("Tyler"), "TYLER"); }
+	public stringTrim() { return test.expect(string.trim(" Tyler "), "Tyler"); }
+	
+	/**********************************************************************
+	 * list tests
+	 *********************************************************************/
+	public listCreate() { this.tlist = list.create(); return test.expectList(this.tlist); }
+	public listAdd() { list.add(this.tlist, "one"); return test.expect(#this.tlist, 1); }
+	public listAddAll() { tmp = []; tmp @= "two"; tmp @= "three"; list.addAll(this.tlist, tmp); return test.expect(#this.tlist, 3); }
+	public listAddAllAt() { tmp = []; tmp @= "two"; tmp @= "three"; list.addAllAt(this.tlist, tmp, 1); return test.expect(this.tlist[2], 'three'); }
+	public listClone() { tmp = list.clone(this.tlist); return test.expect(#tmp, 5); }
+	public listContainsObjRef() { tmp = "hi"; this.tlist @= tmp; return test.expect(list.containsObjRef(this.tlist, tmp), true); }
+	public listContains() { return test.expect(list.contains(this.tlist, 'hi'), true); }
+	public listGet() { return test.expect(list.get(this.tlist, #this.tlist - 1), "hi"); }
+	public listIndexOf() { tmp = "howdy"; this.tlist @= tmp; return test.expect(list.indexOf(this.tlist, tmp), 6); }
+	public listIsEmpty() { return test.expect(list.isEmpty(this.tlist), false); }
+	public listRemove() { tmp = "howdy"; this.tlist @= tmp; list.remove(this.tlist, tmp); return test.expect(#this.tlist, 7); }
+	public listRemoveAt() { list.removeAt(this.tlist, 6); return test.expect(#this.tlist, 6); }
+	public listRemoveAll() { tmp = []; tmp @= "one"; tmp @= "two"; this.tlist @= tmp[0]; this.tlist @= tmp[1]; list.removeAll(this.tlist, tmp); return test.expect(#this.tlist, 3); }
+	public listRetainAll() { tmp = []; tmp @= "one"; tmp @= "two"; this.tlist @= tmp[0]; this.tlist @= tmp[1]; list.retainAll(this.tlist, tmp); return test.expect(#this.tlist, 2); }
+	public listSet() { this.tlist @= "five"; list.set(this.tlist, 2, "three"); return test.expect(this.tlist[2], "three"); }
+	public listSize() { return test.expect(list.size(this.tlist), 3); }
+	public listSubList() { tmp = list.subList(this.tlist, 0, 2); return test.expect(#tmp, 2); }
+	public listSort() { tmp = list.sort(this.tlist); return test.expect(tmp[2], 'two'); }
+	public listSortAsc() { tmp = list.sortAsc(this.tlist); return test.expect(tmp[2], 'one'); }
+	public listSortCustom()
+	{
+		dogs = [];
+		dogs @= new dog("Labrador");
+		dogs @= new dog("Maltese");
+		dogs @= new dog("German Shepherd");
+		sortedDogs = list.sortCustom(dogs, ::"customComparator");
+		return test.expect(sortedDogs[2].breed, "Maltese");
+	}
+	public customComparator(object d1, object d2) { return string.compare(d1.breed, d2.breed); }
+	public listClear() { list.clear(this.tlist); return test.expect(#this.tlist, 0); }
+	
+	/**********************************************************************
+	 * map tests
+	 *********************************************************************/
+	public mapCreate() { this.tmap = map.create(); return test.expectMap(this.tmap); }
+	public mapContainsKey() { this.tmap['name'] = "Tyler"; return test.expect(map.containsKey(this.tmap, 'name'), true); }
+	public mapContainsValue() { val = 'programmer'; this.tmap['occupation'] = val; return test.expect(map.containsVal(this.tmap, val), true); }
+	public mapGet() { return test.expect(map.get(this.tmap, 'occupation'), 'programmer'); }
+	public mapIsEmpty() { return test.expect(map.isEmpty(this.tmap), false); }
+	public mapKeySet() { return test.expect(#map.keySet(this.tmap), 2); }
+	public mapPut() { map.put(this.tmap, 'age', 32); return test.expect(this.tmap['age'], 32); }
+	public mapPutAll() { tm = {}; tm['1'] = 'one'; tm['2'] = 'two'; map.putAll(this.tmap, tm); return test.expect(this.tmap['1'], 'one'); }
+	public mapPutIfAbsent() { map.putIfAbsent(this.tmap, '2', 'three'); return test.expect(this.tmap['2'], 'two'); }
+	public mapRemove() { map.remove(this.tmap, '2'); return test.expect(map.containsKey(this.tmap, '2'), false); }
+	public mapSize() { return test.expect(map.size(this.tmap), #this.tmap); }
+	public mapValues() { mp = {}; mp['name'] = 'Tyler'; return test.expect(map.values(mp)[0], 'Tyler'); }
+	public mapClear() { map.clear(this.tmap); return test.expect(#this.tmap, 0); }
+	
+	
+	/**********************************************************************
+	 * jnode tests
+	 *********************************************************************/
+	public instantiateJnodeObject() { this.jn = new jnode(); return test.expectObject(this.jn, 'jnode'); }
+	public jnodeIsArray() { return test.expect(this.jn.isArray(), false); }
+	public jnodePutGetBool() { this.jn.put("boolVal", true); return test.expect(this.jn.get("boolVal"), true); }
+	public jnodePutGetInt() { this.jn.put("intVal", 15); return test.expect(this.jn.get("intVal"), 15); }
+	public jnodePutGetDouble() { this.jn.put("doubleVal", 123.456); return test.expect(this.jn.get("doubleVal"), 123.456); }
+	public jnodePutGetString() { this.jn.put("stringVal", "hi there"); return test.expect(this.jn.get("stringVal"), "hi there"); }
+	public jnodePutGetList()
+	{
+		tlist = [];
+		tlist @= "my string";
+		this.jn.put("listVal", tlist);
+		return test.expect(this.jn.get("listVal").get(0), "my string");
+	}
+	public jnodePutGetMap()
+	{
+		tmap = {};
+		tmap['myitem'] = 'item';
+		this.jn.put("mapVal", tmap);
+		return test.expect(this.jn.get("mapVal").get("myitem"), "item");
+	}
+	public jnodeGetOrNullNotNull() { return test.expect(this.jn.geton("stringVal"), "hi there"); }
+	public jnodeGetOrNullNull() { return test.expect(this.jn.geton("doesnt_exist"), null); }
+	public jnodeGetCali() { mp = this.jn.getCali(); return test.expect(mp['mapVal']['myitem'] == 'item' , true); }
+	public jnodeGetKeySet() { return test.expectList(this.jn.keySet()); }
+	public jnodeToString()
+	{
+		this.jn = new jnode();
+		this.jn.put("item", "my string");
+		return test.expect(this.jn.toString(), "{\"item\":\"my string\"}");
+	}
+	
+	/**********************************************************************
+	 * jarray tests
+	 *********************************************************************/
+	public instantiateJarrayObject() { this.ja = new jarray(); return test.expectObject(this.ja, 'jarray'); }
+	public jarrayPutGetJnode()
+	{
+		this.jn = new jnode();
+		this.jn.put("item", "value");
+		this.ja.put(this.jn);
+		return test.expect(this.ja.get(0).get("item"), "value");
+	}
+	public jarraySize() { return test.expect(this.ja.size(), 1); }
+	public jarrayIsArray() { return test.expect(this.ja.isArray(), true); }
+	public jarrayGetCali() { arr = this.ja.getCali(); return test.expect(arr[0]['item'] == 'value', true); }
+	public jarrayToString() { return test.expect(this.ja.toString(), "[{\"item\":\"value\"}]"); }
+	
+	/**********************************************************************
+	 * json tests
+	 *********************************************************************/
+	public jsonParseString()
+	{
+		str = '{ "name":"Tyler Durden"}';
+		obj = json.parseString(str);
+		return test.expect(obj.get('name'), "Tyler Durden");
+	}
+	public jsonSaveParseFile()
+	{
+		fileName = "ut_test.json";
+		str = '{ "name":"Tyler Durden"}';
+		tobj = json.parseString(str);
+		json.saveFile(fileName, tobj);
+		obj = json.parseFile(fileName);
+		
+		// cleanup test.json file.
+		if(path.exists(fileName)) { path.unlink(fileName); }
+		
+		return test.expect(obj.get('name'), "Tyler Durden");
+	}
+	
+	/**********************************************************************
+	 * httpClient tests
+	 *********************************************************************/
+	public httpClientInstantiate()
+	{
+		this.cli = new httpClient(new url('http://localhost:8080/getString'));
+		return test.expectObject(this.cli, 'httpClient');
+	}
+	
+	public httpClientGetPage()
+	{
+		pg = this.cli.getString();
+		return test.expect(pg['content'] == 'catjs getString test', true);
+	}
+	
+	public httpClientDoPost()
+	{
+		vals = {};
+		vals['firstName'] = 'Tyler';
+		vals['lastName'] = 'Durden';
+		resp = this.cli.postString(postType.url_encoded, vals);
+		return test.expect(resp['content'] == 'catjs getString test', true);
+	}
+	
+	private httpClientSetConnectionRequestTimeout()
+	{
+		this.cli.setConnectionRequestTimeout(5000);
+		return test.expect(this.cli.getConnectionRequestTimeout(), 5000);
+	}
+	
+	private httpClientSetConnectTimeout()
+	{
+		this.cli.setConnectTimeout(5000);
+		return test.expect(this.cli.getConnectTimeout(), 5000);
+	}
+	
+	private httpClientSetSocketTimeout()
+	{
+		this.cli.setSocketTimeout(5000);
+		return test.expect(this.cli.getSocketTimeout(), 5000);
+	}
+}
