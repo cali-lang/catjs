@@ -273,6 +273,9 @@ static class app
 	cli = null;
 	pg = null;
 	
+	// wsClient test variables
+	ws = null;
+	
 	/*
 	 * Main method is the application entry point. This is called once 
 	 * the window is finished loading the page.
@@ -666,6 +669,9 @@ static class app
 			.add(new jstest("httpClient", "(httpClient) HTTP client set/get connection request timeout.", ::"httpClientSetConnectionRequestTimeout"))
 			.add(new jstest("httpClient", "(httpClient) HTTP client set/get connection timeout.", ::"httpClientSetConnectTimeout"))
 			.add(new jstest("httpClient", "(httpClient) HTTP client set/get socket timeout.", ::"httpClientSetSocketTimeout"))
+			
+			// wsClient tests
+			.add(new jstest("wsClient", "(wsClient) Web socket client instantiate/connect.", ::"wsClientInstantiate"))
 		;
 	}
 	
@@ -1113,5 +1119,36 @@ static class app
 	{
 		this.cli.setSocketTimeout(5000);
 		return test.expect(this.cli.getSocketTimeout(), 5000);
+	}
+	
+	/**********************************************************************
+	 * websocket tests
+	 *********************************************************************/
+	public wsClientInstantiate()
+	{
+		this.ws = new wsClient();
+		this.ws.setOnOpen(::'onOpen');
+		this.ws.setOnClose(::'onClose');
+		this.ws.setOnMessage(::'onMessage');
+		this.ws.open('ws://' + win.host() + '/');
+		win.setTimeout(::'wsClientSendString', 100);
+		return test.expectObject(this.ws, 'wsClient');
+	}
+	
+	public wsClientSendString()
+	{
+		this.ws.send('hello world');
+		return true;
+	}
+	
+	// helpers
+	private onOpen() { console.log('Method onOpen called!'); }
+	private onClose() { console.log('Method onClose called!'); }
+	private onMessage(Msg, MsgType)
+	{
+		if(string.trim(Msg) == 'hello world' && MsgType == msgType.tstring)
+		{
+			console.log('Method onMessage called!');
+		}
 	}
 }

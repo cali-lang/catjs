@@ -58,7 +58,30 @@ class catjsTest : httpServer
 		this.serverName = 'catjsTest/1.0 (' + sys.getCaliVersion() + ', Simple 4.0)';
 		this.httpServer(this.serverPort, ::'handle');				// Call parent constructor
 		
+		// Websocket setup. Tell httpServer to accept websocket connections and then 
+		// set the callbacks for the available websocket methods.
+		this.setAcceptWs(true);
+		this.setOnOpen(::'onWsOpen');
+		this.setOnFrame(::'onWsFrame');
+		
 		console.println("Starting catjsTest on port " + this.serverPort + " ...");
+	}
+	
+	// Called when the websocket is open.
+	private onWsOpen(req, res, id)
+	{
+		console.println((new date()).format() + ' websocket open with id: ' + id);
+		console.println((new date()).format() + ' ws count: ' + #this.getWsMap());
+	}
+	
+	// Called when there's a new frame - simply echo back then close.
+	private onWsFrame(sock, frmType, content)
+	{
+		if(frmType == "text" || frmType == "binary")
+		{
+			sock.send(content);
+			sock.close();
+		}
 	}
 	
 	/* Handle requests */

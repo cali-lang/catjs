@@ -30,6 +30,15 @@ win_construct = function win() {
 	
 	this.alert = function(Text) { alert(Text); return this; }
 	this.scrollBottom = function() { window.scrollTo(0,document.body.scrollHeight); }
+	this.origin = function() { return window.location.origin; }
+	this.host = function() { return window.location.host; }
+	this.setTimeout = function(CallBackMeth, TimeoutMills)
+	{
+		window.setTimeout(function()
+		{
+			CallBackMeth.call();
+		}, TimeoutMills);
+	}
 }
 var win = new win_construct();
 
@@ -941,3 +950,111 @@ var jarray = function jarray() {
 	
 	this.jarray.apply(this, arguments);
 };
+
+/*
+ * wsClient.ca
+ */
+msgType_construct = function msgType() {
+	this.extended = [];
+	this.tstring = 'tstring';
+	this.tbinary = 'tbinary';
+}
+var msgType = new msgType_construct();
+
+var wsClient = function wsClient() {
+	var self = this;
+	
+	this.extended = [];
+	this.ws = null;
+	
+	this.onOpen = null;
+	this.onClose = null;
+	this.onMessage = null;
+	this.onError = null;
+	
+	this.wsClient = function() { };
+	
+	this.open = function(UriString)
+	{
+		if(lang.instanceof(UriString, 'string'))
+		{
+			this.ws = new WebSocket(UriString);
+			this.ws.onopen = this.handleOnOpen;
+			this.ws.onclose = this.handleOnClose;
+			this.ws.onmessage = this.handleOnMessage;
+			this.ws.onerror = this.handleOnError;
+		}
+		else { throw "wsClient.open(): Expecting UriString to be of type 'string' but found '" + lang.type(UriString) + "' instead."; }
+	};
+	
+	this.setOnOpen = function(OnOpen)
+	{
+		if(lang.instanceof(OnOpen, 'callback')) { this.onOpen = OnOpen; }
+		else if(lang.instanceof(OnOpen, 'null')) { this.onOpen = null; }
+		else { throw "wsClient.setOnOpen(): Expecting a callback object."; }
+		return this;
+	};
+	
+	this.setOnClose = function(OnClose)
+	{
+		if(lang.instanceof(OnClose, 'callback')) { this.onClose = OnClose; }
+		else if(lang.instanceof(OnClose, 'null')) { this.onClose = null; }
+		else { throw "wsClient.setOnClose(): Expecting a callback object."; }
+		return this;
+	};
+	
+	this.setOnMessage = function(OnMessage)
+	{
+		if(lang.instanceof(OnMessage, 'callback')) { this.onMessage = OnMessage; }
+		else if(lang.instanceof(OnMessage, 'null')) { this.onMessage = null; }
+		else { throw "wsClient.setOnMessage(): Expecting a callback object."; }
+		return this;
+	};
+	
+	this.setOnError = function(OnError)
+	{
+		if(lang.instanceof(OnError, 'callback')) { this.onError = OnError; }
+		else if(lang.instanceof(OnError, 'null')) { this.onError = null; }
+		else { throw "wsClient.setOnError(): Expecting a callback object."; }
+		return this;
+	};
+	
+	this.send = function(StrOrBuff)
+	{
+		this.ws.send(StrOrBuff);
+		return this;
+	};
+	
+	this.close = function() { this.ws.close(); };
+	
+	this.handleOnOpen = function()
+	{
+		if(self.onOpen !== null) { self.onOpen.call(); }
+	};
+	
+	this.handleOnClose = function()
+	{
+		if(self.onClose !== null) { self.onClose.call(); }
+	};
+	
+	this.handleOnMessage = function(event)
+	{
+		if(self.onMessage !== null)
+		{
+			var mt = msgType.tstring;
+			if(typeof event.data !== "string") { mt = msgType.tbinary; }
+			self.onMessage.call(event.data, mt);
+		}
+	};
+	
+	this.handleOnError = function(err)
+	{
+		if(self.onError !== null) { self.onError.call(err); }
+	};
+	
+	this.wsClient.apply(this, arguments);
+};
+
+
+
+

@@ -53,6 +53,7 @@ jsstr = cjs.compile(true);
 * json *
 * url *
 * httpClient *
+* wsClient
 
 \* Select methods haven't been implemented yet. Some methods aren't implemented because they just don't apply in the browser such as file IO because of security limitations. 
 
@@ -64,4 +65,4 @@ You can launch the example program from Linux/Unix/OSX by running the runTest.sh
 shell> cali -Xss10M catjsTest.ca
 
 # TODO:
-Implement win and doc classes in cali-lang to support local testing. Implement other base cali-lang objects such as regex, hex, uuid, websocket ...
+Implement win and doc classes in cali-lang to support local testing. Implement other base cali-lang objects such as regex, hex, uuid ...
