@@ -182,7 +182,8 @@ class index : _html
 		'sys',
 		'json *',
 		'url *',
-		'httpClient *'
+		'httpClient *',
+		'regex'
 	];
 	
 	// build the page

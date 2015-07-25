@@ -1055,6 +1055,54 @@ var wsClient = function wsClient() {
 	this.wsClient.apply(this, arguments);
 };
 
-
+/*
+ * regex.ca
+ */
+regex_construct = function regex() {
+	this.extended = [];
+	
+	this.match = function(RegexStr, Haystack)
+	{
+		var regx = new RegExp(RegexStr, 'g');
+		//var ret = regx.exec(Haystack);
+		var ret = [];
+		var mtch = null;
+		while((mtch = regx.exec(Haystack)))
+		{
+			ret.push(mtch[0]);
+		}
+		if(lang.instanceof(ret, 'list')) { return ret; }
+		else { return []; }
+	}
+	
+	this.matchFirst = function(RegexStr, Haystack)
+	{
+		var lst = this.match(RegexStr, Haystack);
+		if(lang.count(lst) > 0) { return lst[0]; }
+		else { return null; }
+	}
+	
+	this.matchLast = function(RegexStr, Haystack)
+	{
+		var lst = this.match(RegexStr, Haystack);
+		if(lang.count(lst) > 0) { return lst[lang.count(lst) - 1]; }
+		else { return null; }
+	}
+	
+	this.replace = function(RegexStr, ReplaceStr, Haystack)
+	{
+		var regx = new RegExp(RegexStr, 'g');
+		var ret = Haystack.replace(regx, ReplaceStr);
+		return ret;
+	}
+	
+	this.replaceFirst = function(RegexStr, ReplaceStr, Haystack)
+	{
+		var regx = new RegExp(RegexStr);
+		var ret = Haystack.replace(regx, ReplaceStr);
+		return ret;
+	}
+}
+var regex = new regex_construct();
 
 

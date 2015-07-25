@@ -276,6 +276,9 @@ static class app
 	// wsClient test variables
 	ws = null;
 	
+	// regex test variables
+	testStr = "On a long enough timeline, the survival rate for everyone drops to zero.";
+	
 	/*
 	 * Main method is the application entry point. This is called once 
 	 * the window is finished loading the page.
@@ -672,6 +675,13 @@ static class app
 			
 			// wsClient tests
 			.add(new jstest("wsClient", "(wsClient) Web socket client instantiate/connect.", ::"wsClientInstantiate"))
+			
+			// regex tests
+			.add(new jstest("regex", "(regex) Match all default.", ::"regexMatch"))
+			.add(new jstest("regex", "(regex) Match first.", ::"regexMatchFirst"))
+			.add(new jstest("regex", "(regex) Match last.", ::"regexMatchLast"))
+			.add(new jstest("regex", "(regex) Regex replace.", ::"regexReplace"))
+			.add(new jstest("regex", "(regex) Regex replace first.", ::"regexReplaceFirst"))
 		;
 	}
 	
@@ -1150,5 +1160,38 @@ static class app
 		{
 			console.log('Method onMessage called!');
 		}
+	}
+	
+	/**********************************************************************
+	 * regex tests
+	 *********************************************************************/
+	public regexMatch()
+	{
+		res = regex.match("t.", this.testStr);
+		return test.expect(res[1], "th");
+	}
+	
+	public regexMatchFirst()
+	{
+		res = regex.matchFirst("t.", this.testStr);
+		return test.expect(res, 'ti');
+	}
+	
+	public regexMatchLast()
+	{
+		res = regex.matchLast("t.", this.testStr);
+		return test.expect(res, 'to');
+	}
+	
+	public regexReplace()
+	{
+		res = regex.replace("t.", "th", this.testStr);
+		return test.expect(res, "On a long enough thmeline, the survival rath for everyone drops th zero.");
+	}
+	
+	public regexReplaceFirst()
+	{
+		res = regex.replaceFirst("t.", "th", this.testStr);
+		return test.expect(res, "On a long enough thmeline, the survival rate for everyone drops to zero.");
 	}
 }
