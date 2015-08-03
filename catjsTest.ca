@@ -19,7 +19,7 @@
  * 
  * Purpose:
  * This cali-lang program extends httpServer and when started will serve
- * a catjs test page at localhost:8080.
+ * a catjs test page at localhost:9001.
  * 
  * Requirements:
  * A local installation of cali-lang version 0.95a or later.
@@ -50,7 +50,7 @@ class catjsTest : httpServer
 	}
 
 	serverName = null;			// server name ... set in constructor
-	serverPort = 8080;			// default server port
+	serverPort = 9001;			// default server port
 	
 	public catjsTest()
 	{
