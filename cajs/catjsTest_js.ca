@@ -1094,7 +1094,7 @@ static class app
 	 *********************************************************************/
 	public httpClientInstantiate()
 	{
-		this.cli = new httpClient(new url('http://localhost:8080/getString'));
+		this.cli = new httpClient(new url('http://' + win.host() + '/getString'));
 		return test.expectObject(this.cli, 'httpClient');
 	}
 	
