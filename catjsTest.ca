@@ -229,6 +229,10 @@ class index : _html
 		this.pg.add(new _h3(new _text('About:')));
 		this.pg.add(this.getPageIntro());
 		
+		// download
+		this.pg.add(new _h3(new _text('Download:')));
+		this.pg.add(this.getDownload());
+		
 		// basic usage
 		this.pg.add(new _h3(new _text('Basic Usage:')));
 		this.pg.add(this.getBasicUsage());
@@ -270,6 +274,22 @@ directly into JavaScript and ran in the web browser.
 				.add(new _li('Simplifies web application development.'))
 		);
 		return ret;
+	}
+	
+	/*
+	 * Gets download section.
+	 */
+	private getDownload()
+	{
+		dv = new _div();
+		dv.add((new _p()).text("
+		Download the latest version on Github at 
+		")
+		.add((new _a('https://github.com/cali-lang/catjs', new _text('github.com/cali-lang/catjs'))).set('target', '_blank'))
+		.text('.')
+		);
+		
+		return dv;
 	}
 	
 	/*
