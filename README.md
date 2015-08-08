@@ -4,6 +4,8 @@ Cali-Lang to JavaScript compiler.
 # About:
 Catjs is a cali-lang to javascript transpiler. It's entirely written in cali-lang and uses the native ast.ca library to convert the cali-lang AST into javascript. The goal of catjs is to allow much of the native cali-lang code to be compiled directly into JavaScript and ran in the web browser.
 
+The example site can be viewed at <a href='http://catjs.cali-lang.com/' target='_blank'>catjs.cali-lang.com/</a> .
+
 # Requirements:
 Catjs requires a local installation of cali-lang version 0.95a or later. Get the latest version at <a href='http://www.cali-lang.com/' target='_blank'>http://www.cali-lang.com/</a> .
 
