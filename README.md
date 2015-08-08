@@ -62,7 +62,7 @@ jsstr = cjs.compile(true);
 A word about the dom ... Most programming languages have no native notion of a window or DOM. In order for cali-lang code to interface with the window and document objects within a web browser these objects need to be created. It's not a requirement for catjs to have native implementations of win/doc objects in order to compile to JavaScript and interface with the window/document however they are required for unit testing in cali-lang outside of the browser. Currently the win/doc objects can be used, but don't exist in native cali-lang code ... on the todo list.
 
 # Example Program:
-You can launch the example program from Linux/Unix/OSX by running the runTest.sh shell script. On windows or if you want to run it yourself use the command below. Once the program is launched navigate to localhost:8080 to view the page. The test page includes a few hundred tests compiled from cali-lang into JS.
+You can launch the example program from Linux/Unix/OSX by running the runTest.sh shell script. On windows or if you want to run it yourself use the command below. Once the program is launched navigate to localhost:9001 to view the page. The test page includes a few hundred tests compiled from cali-lang into JS.
 
 shell> cali -Xss10M catjsTest.ca
 
