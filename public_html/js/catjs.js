@@ -79,6 +79,7 @@ doc_construct = function doc() {
 	this.applyCaliMeths = function(el)
 	{
 		el.add = function(HtmlEl) { el.appendChild(HtmlEl); return this; };
+		el.addHtml = function(HtmlStr) { el.innerHTML += HtmlStr; return this; }
 		el.text = function(Text) { el.appendChild(document.createTextNode(Text)); return this; };
 		el.br = function() { el.appendChild(document.createElement('br')); return this; }
 		el.set = function(Key, Val) { el.setAttribute(Key, Val); return this; }
