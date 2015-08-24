@@ -45,6 +45,7 @@ class catjs
 								// variables aren't evaluated when defined, they are for some
 								// reason treated just like a string.
 	
+	classes = {};				// Holds the compiled classes.
 	
 	/***********************************************************************
 	 * Public Methods
@@ -77,8 +78,8 @@ class catjs
 			this.at = new ast();
 			this.at.parse(this.modName);
 			
-			classes = this.at.getClasses();
-			for(key : classes) { res += this.compileClass(classes[key]) + this.nl; }
+			this.classes = this.at.getClasses();
+			for(key : this.classes) { res += this.compileClass(this.classes[key]) + this.nl; }
 			
 			// if main is defined have it called on window load
 			if(this.mainFunct != null) { res += 'window.onload=function(){' + this.mainFunct + '();}'; }
@@ -163,14 +164,27 @@ class catjs
 		}
 		
 		rstr += this.t(t + 1) + 'this.extended=[';
-		for(i = 0; i < #cls.extended; i++)
+		extended = [];
+		this.getExtended(cls.name, extended);
+		for(i = 0; i < #extended; i++)
 		{
 			if(i > 0) { rstr += ","; }
-			rstr += "'" + cls.extended[i] + "'";
+			rstr += "'" + extended[i] + "'";
 		}
 		rstr += '];' + this.nl;
 		
 		return rstr;
+	}
+	
+	private getExtended(string ClassName, list Extended)
+	{
+		cls = this.classes[ClassName];
+		for(i = #cls.extended - 1; i >= 0; i--)
+		{
+			tc = cls.extended[i];
+			this.getExtended(tc, Extended);
+			Extended @= tc;
+		}
 	}
 	
 	/*
