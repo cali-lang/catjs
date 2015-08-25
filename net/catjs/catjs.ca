@@ -142,7 +142,7 @@ class catjs
 			// if has arguments, run constructor w/args
 			if(this.hasConstructor(cls))
 			{
-				rstr += this.t(1) + 'this.' + cls.name + '.apply(this, arguments);' + this.nl;
+				rstr += this.t(1) + "if(this.constructor == " + cls.name + ") { this." + cls.name + ".apply(this, arguments); }" + this.nl;
 			}
 			
 			rstr += "};" + this.nl;
