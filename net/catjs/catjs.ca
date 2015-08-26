@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-include console;
 include lang.ast;
 
 /*
@@ -223,7 +222,6 @@ class catjs
 				if(this.mainFunct == null && fname == 'main') 
 				{
 					this.mainFunct = cls.name + '.' + fname;
-					console.println('main:' + this.mainFunct);
 				}
 			}
 		
