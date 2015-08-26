@@ -213,8 +213,6 @@ class catjs
 		rstr = '';
 		for(fname : cls.functions)
 		{
-			
-			
 			this.locals = [];
 			funct = cls.functions[fname];
 			fargs = this.getFunctArgs(funct.value.args);
@@ -234,6 +232,9 @@ class catjs
 			{
 				rstr += this.t(t + 1) + "var etc=(Array.prototype.slice.call(arguments)).slice(" + (#funct.value.args - 1) + ");" + this.nl;
 			}
+			
+			rstr += this.getDefaultArgValues(funct.value.args, t + 1);
+			
 			rstr += this.getInstructions(funct.value.instructions, t + 1);
 			rstr += this.t(t) + "};" + this.nl;
 		}
@@ -269,6 +270,25 @@ class catjs
 			}
 		}
 		return string.implode(alist, ', ');
+	}
+	
+	private getDefaultArgValues(object args, t)
+	{
+		rstr = '';
+		for(aobj : args)
+		{
+			if(!(aobj instanceof 'cetcetera'))
+			{
+				if(aobj.value != null)
+				{
+					val = null;
+					if(aobj.value.value instanceof 'string') { val = "\"" + aobj.value.value + "\""; }
+					else { val = '' + aobj.value.value; }
+					rstr += this.t(t) + "if(typeof(" + aobj.name + ")==='undefined'){" + aobj.name + "=" + val + ";}" + this.nl;
+				}
+			}
+		}
+		return rstr;
 	}
 	
 	/*
