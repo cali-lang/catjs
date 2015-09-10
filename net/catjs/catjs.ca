@@ -46,6 +46,8 @@ class catjs
 	
 	classes = {};				// Holds the compiled classes.
 	
+	classBlackList = [];		// Holds blacklisted classes.
+	
 	/***********************************************************************
 	 * Public Methods
 	 **********************************************************************/
@@ -59,6 +61,15 @@ class catjs
 	{
 		this.modName = ModuleName;
 	}
+	
+	/**
+	 * Adds a class name to the class black list. This can be useful if 
+	 * you are including files with other includes that you don't want 
+	 * compiled into JS.
+	 * @p ClassName is a sting with the class name to blacklist.
+	 * @r this
+	 */
+	public addBlacklistClass(string ClassName) { this.classBlackList @= ClassName; return this; }
 	
 	/*
 	 * Compile function compiles the module(s) and returns a string with 
@@ -78,7 +89,13 @@ class catjs
 			this.at.parse(this.modName);
 			
 			this.classes = this.at.getClasses();
-			for(key : this.classes) { res += this.compileClass(this.classes[key]) + this.nl; }
+			for(key : this.classes)
+			{
+				if(!list.contains(this.classBlackList, key))
+				{
+					res += this.compileClass(this.classes[key]) + this.nl;
+				}
+			}
 			
 			// if main is defined have it called on window load
 			if(this.mainFunct != null) { res += 'window.onload=function(){' + this.mainFunct + '();}'; }
