@@ -889,3 +889,47 @@ class catjs
 		return '(' + content + ')';
 	}
 }
+
+/**
+ * Utility class with methods for handing javascript. Allows for 
+ * generic interfacing to/from cali-lang and javascript.
+ */
+static class jsutil
+{
+	/**
+	 * Creates a new JS instance of a class with the provided class 
+	 * name and variable number of arguments. When called from cali-lang 
+	 * this method throws an exception as it is meant to only be called 
+	 * from JS.
+	 * @p NameSpace is an object with the namespace with the class. If 
+	 * null window will be used. (Optional)
+	 * @p ClassName is a string with the class name to instantiate. (Required)
+	 * @p ... is a variable number of arguments to pass to the 
+	 * object constructor.
+	 * @r A object that has been instantiated.
+	 * @t Throws an exception if called from native cali-lang, or if 
+	 * there's an exception when instantiating the object.
+	 */
+	public inst(object NameSpace = null, string ClassName = null, ...)
+	{
+		throw "jsutil.inst(): Not implemented for native cali-lang. Expected to be called from javascript only.";
+	}
+	
+	/**
+	 * Calls a method on the provided object, or if no object is provided 
+	 * attempts to call the global method. When called from cali-lang 
+	 * this method throws an exception as it is meant to only be called 
+	 * from JS. If the method name is null or blank an exception will 
+	 * be thrown.
+	 * @p Obj is a JS object to call the method on. (Optional)
+	 * @p MethName is a string with the method name. (Not Optional)
+	 * @p ... is a variable number of arguments to pass to the the 
+	 * method.
+	 * @r Any object that the function call would normally return.
+	 * @t Throws any exception the called function would throw.
+	 */
+	public call(object Obj = null, string MethName = null, ...)
+	{
+		throw "jsutil.inst(): Not implemented for native cali-lang. Expected to be called from javascript only.";
+	}
+}

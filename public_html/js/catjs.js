@@ -96,6 +96,52 @@ doc_construct = function doc() {
 var doc = new doc_construct();
 
 /*
+ * jsutil
+ */
+jsutil_construct = function jsutil() {
+	this.extended = [];
+	
+	this.inst = function()
+	{
+		var tarr = Array.prototype.slice.call(arguments);
+		if(tarr.length > 1)
+		{
+			var fargs = tarr.slice(2);
+			
+			var scope = tarr[0];
+			if(!scope) { scope = window; }
+			var objName = tarr[1];
+			if(lang.instanceof(objName, 'string'))
+			{
+				return new (Function.prototype.bind.apply(scope[objName], fargs));
+			}
+			else throw "jsutil.inst(): Expecting second argument to be of type 'string'.";
+		}
+		else throw "jsutil.inst(): Expecting at least a string argument for the object name.";
+	}
+	
+	this.call = function()
+	{
+		var tarr = Array.prototype.slice.call(arguments);
+		if(tarr.length > 1)
+		{
+			var fargs = tarr.slice(2);
+			
+			var objInst = tarr[0];
+			var methName = tarr[1];
+			if(lang.instanceof(methName, 'string'))
+			{
+				if(objInst) { return objInst[methName](fargs); }
+				else { return window[methName](fargs); }
+			}
+			else throw "jsutil.call(): Expecting first argument to be of type 'string'.";
+		}
+		else throw "jsutil.call(): Expecting at least a string argument for the method name.";
+	}
+}
+var jsutil = new jsutil_construct();
+
+/*
  * lang.ca
  */
 lang_construct = function lang() {
