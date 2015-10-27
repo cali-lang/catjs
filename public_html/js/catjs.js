@@ -76,10 +76,22 @@ doc_construct = function doc() {
 		else { throw "doc.get(): No element found with id '" + IdStr + "'."; }
 	}
 	
+	this.getByName = function(NameStr)
+	{
+		var els = document.getElementsByName(NameStr);
+		if(els && els.length > 0 && els[0] && typeof els[0] !== 'undefined')
+		{
+			if(typeof els[0].add === 'undefined') this.applyCaliMeths(els[0]);
+			return els[0];
+		}
+		else { throw "doc.getByName(): No element found with name '" + NameStr + "'."; }
+	}
+	
 	this.applyCaliMeths = function(el)
 	{
 		el.add = function(HtmlEl) { el.appendChild(HtmlEl); return this; };
 		el.addHtml = function(HtmlStr) { el.innerHTML += HtmlStr; return this; }
+		el.setHtml = function(HtmlStr) { el.innerHTML = HtmlStr; return this; }
 		el.text = function(Text) { el.appendChild(document.createTextNode(Text)); return this; };
 		el.br = function() { el.appendChild(document.createElement('br')); return this; }
 		el.set = function(Key, Val) { el.setAttribute(Key, Val); return this; }
@@ -131,8 +143,8 @@ jsutil_construct = function jsutil() {
 			var methName = tarr[1];
 			if(lang.instanceof(methName, 'string'))
 			{
-				if(objInst) { return objInst[methName](fargs); }
-				else { return window[methName](fargs); }
+				if(objInst) { return objInst[methName].apply(objInst, fargs); }
+				else { return window[methName].apply(window, fargs); }
 			}
 			else throw "jsutil.call(): Expecting first argument to be of type 'string'.";
 		}
