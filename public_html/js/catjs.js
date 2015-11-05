@@ -87,6 +87,12 @@ doc_construct = function doc() {
 		else { throw "doc.getByName(): No element found with name '" + NameStr + "'."; }
 	}
 	
+	this.getBody = function()
+	{
+		this.applyCaliMeths(document.body);
+		return document.body;
+	}
+	
 	this.applyCaliMeths = function(el)
 	{
 		el.add = function(HtmlEl) { el.appendChild(HtmlEl); return this; };
@@ -103,6 +109,22 @@ doc_construct = function doc() {
 		el.setVal = function(Val) { return el.value = Val; return this; }
 		el.getVal = function() { return el.value; }
 		el.clear = function() { while (this.firstChild) { this.removeChild(this.firstChild); } return this; }
+		el.remove = function(Id)
+		{
+			for (var i = 0; i < this.children.length; i++)
+			{
+				var child = this.children[i];
+				if(child.getAttribute("id") == Id) { this.removeChild(child); break; }
+			}
+			return this;
+		}
+	}
+	
+	this.remove = function(Id)
+	{
+		var el = document.getElementById(Id);
+		if(el && el.parentNode) { el.parentNode.removeChild(el); }
+		return this;
 	}
 }
 var doc = new doc_construct();
@@ -150,6 +172,8 @@ jsutil_construct = function jsutil() {
 		}
 		else throw "jsutil.call(): Expecting at least a string argument for the method name.";
 	}
+	
+	this.slashes = function(Str) { return Str; }
 }
 var jsutil = new jsutil_construct();
 

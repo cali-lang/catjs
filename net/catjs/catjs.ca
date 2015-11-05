@@ -932,4 +932,12 @@ static class jsutil
 	{
 		throw "jsutil.inst(): Not implemented for native cali-lang. Expected to be called from javascript only.";
 	}
+	
+	/**
+	 * Used to format slashes differently for JS and cali-lang.
+	 */
+	public slashes(string Str)
+	{
+		return string.replace(Str, "\\\\", "\\");
+	}
 }
