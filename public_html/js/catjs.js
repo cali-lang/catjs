@@ -126,6 +126,22 @@ doc_construct = function doc() {
 		if(el && el.parentNode) { el.parentNode.removeChild(el); }
 		return this;
 	}
+	
+	this.newFromHtml = function(HtmlString)
+	{
+		var dv = document.createElement('div');
+		dv.innerHTML = HtmlString;
+		var ret = dv.firstChild;
+		this.applyCaliMeths(ret);
+		return ret;
+	}
+	
+	this.replace = function(Id, NewElement)
+	{
+		var el = document.getElementById(Id);
+		if(el && el.parentNode) { el.parentNode.replaceChild(NewElement, el); }
+		return this;
+	}
 }
 var doc = new doc_construct();
 
